@@ -1,37 +1,36 @@
 % ==========================================================
 % Fibrin Network Simulation Script
 % ==========================================================
-function [porosity, composition, ClotMatrix] = Thrombogen(counter)
+function  Thrombogen_illustration_code()
 % ==========================================================
 % Section 0: Initialization
 % ==========================================================
-seed = 2000 + counter;
+seed = 16+108;
 go_forward = false;
 
 rng(seed); % Set random seed for reproducibility
 % Define physical and simulation parameters
-numSpheres = randi(500);
-max_diameter_factor = 0.5*rand();
-clot_volume = 4e7;
-Window_size = 100; % Simulation domain size (µm)
-Window_size_crop = 72; % Cropping size (µm)
-Croped_clot_dim = 144; % Matrix resolution per dimension
-Resolution = Window_size_crop / Croped_clot_dim; % µm per voxel
-platelet_ratio = rand();
-fibrin_concentration = 3; % g/L
-voxel_volume = Window_size_crop^3;
-density_threshold = 0.001;
+numSpheres = 100; % Number of spherical inclusions
+max_diameter_factor = 0.1; % Maximum sphere diameter as a fraction of the largest dimension
+fibrin_concentration = 0.5 + 1 * rand(); % g/L ; % Generate random fibrin concentration between 0.2 and 2 g/L
+clot_volume = 1e6+3e6*rand(); % Generate a random clot volume between 8e3 and 3.7e7 um3
+Window_size = 200; % in um3
+platelet_ratio = rand(); % Ratio of platelets to be plotted
+density_threshold = 0.001; % Minimum density threshold for nodes between inclusions (nodes/um^3)
+scaling_factor_RBC = 1;
+rbc_diameter = 8 / scaling_factor_RBC;  % Approximate RBC size
+% Set parameters based on fibrin concentration using interpolation (from literature data)
+C1 = 0.4; L1 = 4.87; Z1 = 3.19; B1_1 = 0.94; B_hat1 = 1.89; v1 = 0.339;
+C2 = 1.6; L2 = 2.99; Z2 = 3.33; B1_2 = 0.91; B_hat2 = 1.51; v2 = 0.341;
+% Define a prefered directional vector
+preferred_direction = [1, 1, 1];
+preferred_direction = preferred_direction / norm(preferred_direction); % Normalize
+direction_weight = 0; % Weight factor for directional alignment (adjust this based on your preference)
 platelet_radius = 1.5; %(um)
-rbc_filling_factor = 0.5+0.5*rand();
+rbc_filling_factor = 1;
 angle_balancing_weight = 1;
 
-% Interpolation constants for physical properties
-C1 = 0.4; L1 = 4.87; Z1 = 3.19; v1 = 0.339;
-C2 = 1.6; L2 = 2.99; Z2 = 3.33; v2 = 0.341;
 
-% Directional preference setup
-preferred_direction = [1, 1, 1] / norm([1, 1, 1]);
-direction_weight = 0; % Set to >0 to add directional alignment
 
 % ==========================================================
 % Section 1: Generate Inclusions
@@ -99,7 +98,7 @@ end
 % Section 2: Effective Volume Calculation
 % ==========================================================
 % Estimate total clot volume and effective fibrin volume
-clot_volume_um3 = max((4/3)*pi*Window_size_crop^3,calculate_clot_volume(sphere_centers, sphere_radii));
+clot_volume_um3 = calculate_clot_volume(sphere_centers, sphere_radii);
 total_inclusion_volume_um3 = sum((4 / 3) * pi * (sphere_radii.^3));
 % Calculate effective fibrin volume (excluding inclusions)
 effective_fibrin_volume_um3 = 1.5*(clot_volume_um3 - total_inclusion_volume_um3);
@@ -503,105 +502,81 @@ for i = 1:size(bonds, 1)
     connection_counts(bonds(i, 2)) = connection_counts(bonds(i, 2)) + 1;
 end
 
+% % ==========================================================
+% % Section 11: Insert RBCs
+% % ==========================================================
+[rbc_points_all, rbc_indices] = place_rbc_in_spheres( ...
+    sphere_centers, sphere_radii, rbc_filling_factor);
+% % ==========================================================
+% % Section 12: Insert Platelets
+% % ==========================================================
+platelet_centers = insert_platelets(Points, connection_counts, platelet_ratio);
+% % ==========================================================
+% Section 13: Export clot geometry for Blender
+% Bezier fibrin strands, RBC alpha surfaces, platelet spheres
 % ==========================================================
-% Section 11: 3D Matrix Setup
-% ==========================================================
-% Prepare empty voxel matrix and coordinate mapping
-Window_center = mean(Points,1);
 
-% Define the bounds of the cropping window
-crop_min = Window_center-Window_size_crop/2; % Minimum bound in um
-crop_max = Window_center+Window_size_crop/2;  % Maximum bound in um
+% Center everything
+all_coords = [Points; rbc_points_all; platelet_centers];
+box_padding = 10;
+min_xyz = min(all_coords, [], 1) - box_padding;
+max_xyz = max(all_coords, [], 1) + box_padding;
+center_shift = mean([min_xyz; max_xyz]);
+Points           = Points - center_shift;
+rbc_points_all   = rbc_points_all - center_shift;
+platelet_centers = platelet_centers - center_shift;
 
-% Initialize the 3D matrix
-ClotMatrix = single(zeros(Croped_clot_dim, Croped_clot_dim, Croped_clot_dim));
+% Extract individual RBCs using rbc_indices
+rbc_clusters = cell(size(rbc_indices));
+for i = 1:length(rbc_indices)
+    rbc_clusters{i} = rbc_points_all(rbc_indices{i}, :);
+end
 
-% Function to map coordinates into the matrix indices
-map_to_matrix = @(coords) round((coords - crop_min) / Resolution) + 1;
+% Initialize geometry storage
+fv_all.vertices = [];
+fv_all.faces = [];
+fv_all.colors = [];
 
-% ==========================================================
-% Section 12: Insert Fibrin Bonds
-% ==========================================================
-% Use Bezier curves to draw and map fibrin fibers
-[ClotMatrix, bond_length_total] = draw_fibrin_bonds(bonds, Points, crop_min, crop_max, Croped_clot_dim, map_to_matrix);
-% ==========================================================
-% Section 13: Insert RBCs
-% ==========================================================
-[ClotMatrix, rbc_points_all] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, map_to_matrix,rbc_filling_factor);
-% ==========================================================
-% Section 14: Insert Platelets
-% ==========================================================
-[ClotMatrix, num_platelets_output, platelet_centers] = insert_platelets(ClotMatrix, Points, connection_counts, platelet_radius, platelet_ratio, crop_min, crop_max, Croped_clot_dim, map_to_matrix, Resolution);
-% ==========================================================
-% Section 15: Compute Porosity and Composition
-% ==========================================================
-Fibrin_diamter = 2*fibrin_radius;
-platelet_diamter = 2 * platelet_radius / (Window_size_crop / Croped_clot_dim);
-Fibrin_volume = bond_length_total * pi * (Fibrin_diamter / 2)^2;
-Platelet_volume = num_platelets_output * (4/3) * pi * (platelet_diamter / 2)^3;
-RBC_volume = nnz(ClotMatrix(:) == 1);
-composition = RBC_volume / (RBC_volume + Fibrin_volume + Platelet_volume);
-porosity = 1 - ((RBC_volume + Fibrin_volume + Platelet_volume) / Croped_clot_dim^3);
+% --- Fibrin as Bezier tubes ---
+tube_radius = 0.1;
+n_segments = 8;
+n_samples = 20;
+for i = 1:size(bonds,1)
+    p0 = Points(bonds(i,1), :);
+    p2 = Points(bonds(i,2), :);
+    control = (p0 + p2)/2 + (rand(1,3)-0.5)*1;
+    t = linspace(0,1,n_samples)';
+    curve = (1 - t).^2 .* p0 + 2*(1 - t).*t .* control + t.^2 .* p2;
+    [v,f] = tubeAlongCurve(curve, tube_radius, n_segments);
+    fv_all = appendMesh(fv_all, v, f, repmat([255 255 255], size(v,1), 1));
+end
 
-% % % % % ==========================================================
-% % % % % Section 16: Write LAMMPS DATA file for OVITO (full shapes)
-% % % % % ==========================================================
-% % % % outputFile = sprintf('clot_%s_%dpts_%dbonds.dat', ...
-% % % %     datestr(now,'yyyymmdd_HHMM'), size(Points,1), size(bonds,1)); %#ok<TNOW1>
-% % % % 
-% % % % % Center everything
-% % % % all_coords = [Points; rbc_points_all; platelet_centers];
-% % % % box_padding = 10;
-% % % % min_xyz = min(all_coords, [], 1) - box_padding;
-% % % % max_xyz = max(all_coords, [], 1) + box_padding;
-% % % % center_shift = mean([min_xyz; max_xyz]);
-% % % % 
-% % % % Points          = Points - center_shift;
-% % % % rbc_points_all  = rbc_points_all - center_shift;
-% % % % platelet_centers = platelet_centers - center_shift;
-% % % % 
-% % % % % Atom table
-% % % % nFibrin = size(Points, 1);
-% % % % nRBC    = size(rbc_points_all, 1);
-% % % % nPLT    = size(platelet_centers, 1);
-% % % % nAtoms  = nFibrin + nRBC + nPLT;
-% % % % nBonds  = size(bonds, 1);
-% % % % 
-% % % % id   = (1:nAtoms).';
-% % % % mol  = zeros(nAtoms,1);
-% % % % type = [ ...
-% % % %     ones(nFibrin,1);     % 1 = fibrin
-% % % %     2 * ones(nRBC,1);    % 2 = RBC voxels
-% % % %     3 * ones(nPLT,1)];   % 3 = platelets
-% % % % 
-% % % % coord = [Points; rbc_points_all; platelet_centers];
-% % % % Atoms = [id mol type coord];
-% % % % 
-% % % % Bonds = [(1:nBonds).'  ones(nBonds,1)  bonds];  % only connect fibrin
-% % % % 
-% % % % % Write file
-% % % % fid = fopen(outputFile,'w');
-% % % % fprintf(fid,"LAMMPS data file – fibrin, RBC shape, platelet centers\n\n");
-% % % % fprintf(fid,"%d atoms\n%d bonds\n\n", nAtoms, nBonds);
-% % % % fprintf(fid,"3 atom types\n1 bond types\n\n");
-% % % % fprintf(fid,"%g %g xlo xhi\n%g %g ylo yhi\n%g %g zlo zhi\n\n", ...
-% % % %     min(coord(:,1))-box_padding, max(coord(:,1))+box_padding, ...
-% % % %     min(coord(:,2))-box_padding, max(coord(:,2))+box_padding, ...
-% % % %     min(coord(:,3))-box_padding, max(coord(:,3))+box_padding);
-% % % % 
-% % % % fprintf(fid,"Masses\n\n");
-% % % % fprintf(fid,"1 1.0\n2 1.0\n3 1.0\n\n");
-% % % % 
-% % % % fprintf(fid,"Atoms # atomic\n\n");
-% % % % fprintf(fid,"%d %d %d %.6f %.6f %.6f\n", Atoms.');
-% % % % 
-% % % % fprintf(fid,"\nBonds\n\n");
-% % % % fprintf(fid,"%d %d %d %d\n", Bonds.');
-% % % % fclose(fid);
-% % % % 
-% % % % fprintf('✅ LAMMPS data file written to %s\n', outputFile);
+% --- RBCs as alpha surfaces ---
+for i = 1:length(rbc_clusters)
+    pts = rbc_clusters{i};
+    if size(pts,1) < 4, continue; end
+    try
+        shp = alphaShape(pts, 1.5);
+        [f, v] = boundaryFacets(shp);
+    catch
+        [~, f, v] = convhull(pts);
+    end
+    fv_all = appendMesh(fv_all, v, f, repmat([255 0 0], size(v,1), 1));
+end
 
+% --- Platelets as spheres ---
+[sp_v, sp_f] = icosphere(2);
+sp_v = sp_v * 0.75;
+for i = 1:size(platelet_centers,1)
+    v = sp_v + platelet_centers(i,:);
+    f = sp_f;
+    fv_all = appendMesh(fv_all, v, f, repmat([0 0 255], size(v,1), 1));
+end
 
+% --- Write to PLY ---
+ply_filename = sprintf('clot_fullshape_%s.ply', datestr(now,'yyyymmdd_HHMM')); %#ok<TNOW1>
+writePLYMesh(fv_all.vertices, fv_all.faces, fv_all.colors, ply_filename);
+fprintf('✅ Blender mesh written to %s\n', ply_filename);
 end
 
 % ==========================================================
@@ -735,13 +710,18 @@ dt = delaunayTriangulation(all_points);
 [~, volume] = convexHull(dt);
 total_volume = volume * 1.1;
 end
+
+
 % ==========================================================
 % Helper Function: place_rbc_in_spheres
 % ==========================================================
-function [ClotMatrix, rbc_points_all] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, map_to_matrix,rbc_filling_factor)
+function [rbc_points_all, rbc_indices] = place_rbc_in_spheres( ...
+    sphere_centers, sphere_radii, rbc_filling_factor)
+
 % Parameters
 RBC_diameter_noncompacted = 8; % in um
 rbc_points_all = [];
+rbc_indices = {};  % Store indices for each RBC
 
 for i = 1:length(sphere_radii)
     radius_sphere = sphere_radii(i);
@@ -757,9 +737,10 @@ for i = 1:length(sphere_radii)
     [P, Q, R] = rbc_shape_constants(scaling);
 
     % Estimate number of RBCs
-    num_RBCs = floor(rbc_filling_factor*(radius_sphere / (rbc_d / 2))^3);
+    num_RBCs = floor(rbc_filling_factor * (radius_sphere / (rbc_d / 2))^3);
+
     % Start placing RBCs
-    rbc_positions = generate_random_point_in_sphere(radius_sphere-rbc_d/2, sphere_center);
+    rbc_positions = generate_random_point_in_sphere(radius_sphere - rbc_d/2, sphere_center);
     max_attempts = 1000;
     attempt = 0;
 
@@ -769,31 +750,22 @@ for i = 1:length(sphere_radii)
         valid = filter_valid_rbc_positions(batch, rbc_positions, sphere_center, radius_sphere, min_dist);
         rbc_positions = [rbc_positions; valid];
     end
+
     % Generate voxelized RBCs
     for j = 1:size(rbc_positions, 1)
         center = rbc_positions(j, :);
         rot = rand(1, 3) * pi;
         rbc_pts = generate_rbc_voxels(center, rot, P, Q, R);
         if size(rbc_pts, 1) >= 4
+            offset = size(rbc_points_all, 1);
             rbc_points_all = [rbc_points_all; rbc_pts];
+            rbc_indices{end+1} = offset + (1:size(rbc_pts, 1));
         end
     end
 end
 
-% Convert to matrix indices
-rbc_idx_array = map_to_matrix(rbc_points_all);  % N x 3 matrix
-
-% Remove out-of-bound indices
-valid_mask = all(rbc_idx_array > 0, 2) & all(rbc_idx_array <= Croped_clot_dim, 2);
-valid_indices = rbc_idx_array(valid_mask, :);
-
-% Convert to linear indices for assignment
-lin_idx = sub2ind([Croped_clot_dim, Croped_clot_dim, Croped_clot_dim], valid_indices(:,1), valid_indices(:,2), valid_indices(:,3));
-
-% Assign RBCs to matrix in one go
-ClotMatrix(lin_idx) = 1;
-
 end
+
 % ==========================================================
 % Helper Function: generate_random_point_in_sphere
 % ==========================================================
@@ -870,60 +842,9 @@ y = xt * sin(rot(3)) + yt * cos(rot(3));
 xr = x; yr = y; zr = z;
 end
 % ==========================================================
-% Helper Function: draw_fibrin_bonds
-% ==========================================================
-function [ClotMatrix, bond_length_total] = draw_fibrin_bonds(bonds, Points, crop_min, crop_max, Croped_clot_dim, map_to_matrix)
-%DRAW_FIBRIN_BONDS Initializes and draws curved fibrin bonds using quadratic Bezier curves
-%   bonds: [N x 2] index pairs of connected points
-%   Points: [M x 3] coordinates of the nodes
-%   crop_min, crop_max: 1x3 bounds for cropping
-%   Croped_clot_dim: scalar value indicating the size of a cubic 3D ClotMatrix (e.g., 240)
-%   map_to_matrix: function to convert physical coordinates to matrix indices
-
-% Initialize ClotMatrix as a cubic 3D uint8 matrix
-ClotMatrix = zeros(Croped_clot_dim, Croped_clot_dim, Croped_clot_dim, 'uint8');
-bond_length_total = 0;
-num_bond_points = 50;
-
-% Precompute Bezier parameter t
-t = linspace(0, 1, num_bond_points)';
-T0 = (1 - t).^2;
-T1 = 2 * (1 - t) .* t;
-T2 = t.^2;
-
-for i = 1:size(bonds, 1)
-    P0 = Points(bonds(i, 1), :);
-    P2 = Points(bonds(i, 2), :);
-
-    % Randomized control point for Bezier curve
-    P1 = (P0 + P2) / 2 + (rand(1, 3) - 0.5) * 2;
-
-    % Estimate bond length in voxel space
-    P_idx_0 = map_to_matrix(P0);
-    P_idx_1 = map_to_matrix(P1);
-    if all(P_idx_0 > 0 & P_idx_0 <= Croped_clot_dim) && all(P_idx_1 > 0 & P_idx_1 <= Croped_clot_dim)
-        bond_length_total = bond_length_total + sqrt(sum((P_idx_1 - P_idx_0).^2));
-    end
-
-    % Bezier curve points (vectorized)
-    bezier_curve = T0 * P0 + T1 * P1 + T2 * P2;
-
-    % Filter out-of-crop points
-    inside_crop = all(bezier_curve >= crop_min, 2) & all(bezier_curve <= crop_max, 2);
-    voxel_points = bezier_curve(inside_crop, :);
-
-    % Map to voxel indices and write to ClotMatrix
-    idx_vox = map_to_matrix(voxel_points);
-    valid_vox = all(idx_vox > 0, 2) & all(idx_vox <= Croped_clot_dim, 2);
-    idx_vox = idx_vox(valid_vox, :);
-    lin_idx = sub2ind([Croped_clot_dim, Croped_clot_dim, Croped_clot_dim], idx_vox(:,1), idx_vox(:,2), idx_vox(:,3));
-    ClotMatrix(lin_idx) = 2; % Mark fibrin voxels
-end
-end
-% ==========================================================
 % Helper Function: insert_platelets
 % ==========================================================
-function [ClotMatrix, num_platelets_output, platelet_centers] = insert_platelets(ClotMatrix, Points, connection_counts, platelet_radius, platelet_ratio, crop_min, crop_max, Croped_clot_dim, map_to_matrix, Resolution)
+function platelet_centers = insert_platelets(Points, connection_counts, platelet_ratio)
 %INSERT_PLATELETS Inserts spherical platelet voxels at cross-link points (valency = 4)
 
 % Identify eligible points
@@ -931,32 +852,125 @@ platelet_indices = find(connection_counts == 4);
 num_platelets_to_plot = round(platelet_ratio * length(platelet_indices));
 platelet_indices = randsample(platelet_indices, num_platelets_to_plot);
 platelet_centers = Points(platelet_indices,:);
-num_platelets_output = 0;
-
-% Precompute grid offsets
-grid_range = -platelet_radius:Resolution:platelet_radius;
-[xg, yg, zg] = ndgrid(grid_range, grid_range, grid_range);
-offsets = [xg(:), yg(:), zg(:)];
-distances = sqrt(sum(offsets.^2, 2));
-unit_sphere_offsets = offsets(distances <= platelet_radius, :);
-
-% Loop through each platelet index
-for i = 1:num_platelets_to_plot
-    center = Points(platelet_indices(i), :);
-
-    if all(center >= crop_min & center <= crop_max)
-        center_idx = map_to_matrix(center);
-        if all(center_idx > 0 & center_idx <= Croped_clot_dim)
-            num_platelets_output = num_platelets_output + 1;
-            voxel_coords = unit_sphere_offsets + center;
-
-            % Map to matrix indices
-            idx_vox = map_to_matrix(voxel_coords);
-            valid_vox = all(idx_vox > 0, 2) & all(idx_vox <= Croped_clot_dim, 2);
-            idx_vox = idx_vox(valid_vox, :);
-            lin_idx = sub2ind([Croped_clot_dim, Croped_clot_dim, Croped_clot_dim], idx_vox(:,1), idx_vox(:,2), idx_vox(:,3));
-            ClotMatrix(lin_idx) = 3; % Platelet voxel
+end
+% ==========================================================
+% Helper Function: tubeAlongCurve
+% ==========================================================
+function [V, F] = tubeAlongCurve(P, radius, seg)
+N = size(P,1);
+V = []; F = [];
+for i = 1:N
+    t = max(i-1,1); u = min(i+1,N);
+    dir = P(u,:) - P(t,:);
+    dir = dir / norm(dir + 1e-6);
+    [cx, cy, ~] = cylinder(radius, seg);
+    ring = [cx(1, 1:end-1)', cy(1, 1:end-1)', zeros(seg,1)];
+    R = vrrotvec2mat(vrrotvec([0 0 1], dir));
+    ring = (R * ring')' + P(i,:);
+    V = [V; ring];
+    if i > 1
+        idx = size(V,1) - 2*seg;
+        for j = 1:seg
+            j2 = mod(j,seg)+1;
+            F = [F; idx+j, idx+seg+j, idx+seg+j2; idx+j, idx+seg+j2, idx+j2];
         end
     end
 end
+end
+% ==========================================================
+% Helper Function: appendMesh
+% ==========================================================
+function fv = appendMesh(fv, v, f, c)
+if isempty(fv.vertices)
+    fv.vertices = v;
+    fv.faces = f;
+    fv.colors = c;
+else
+    offset = size(fv.vertices,1);
+    fv.vertices = [fv.vertices; v];
+    fv.faces = [fv.faces; f + offset];
+    fv.colors = [fv.colors; c];
+end
+end
+% ==========================================================
+% Helper Function: writePLYMesh
+% ==========================================================
+function writePLYMesh(vertices, faces, colors, filename)
+fid = fopen(filename, 'w');
+fprintf(fid, 'ply\nformat ascii 1.0\n');
+fprintf(fid, 'element vertex %d\n', size(vertices,1));
+fprintf(fid, 'property float x\nproperty float y\nproperty float z\n');
+fprintf(fid, 'property uchar red\nproperty uchar green\nproperty uchar blue\n');
+fprintf(fid, 'element face %d\n', size(faces,1));
+fprintf(fid, 'property list uchar int vertex_indices\n');
+fprintf(fid, 'end_header\n');
+for i = 1:size(vertices,1)
+    fprintf(fid, '%.4f %.4f %.4f %d %d %d\n', vertices(i,1), vertices(i,2), vertices(i,3), colors(i,1), colors(i,2), colors(i,3));
+end
+for i = 1:size(faces,1)
+    fprintf(fid, '3 %d %d %d\n', faces(i,1)-1, faces(i,2)-1, faces(i,3)-1);
+end
+fclose(fid);
+end
+
+function [V,F] = icosphere(subdivisions)
+% Create an icosphere mesh (triangulated sphere)
+t = (1 + sqrt(5)) / 2;
+
+verts = [-1,  t,  0;
+    1,  t,  0;
+    -1, -t,  0;
+    1, -t,  0;
+    0, -1,  t;
+    0,  1,  t;
+    0, -1, -t;
+    0,  1, -t;
+    t,  0, -1;
+    t,  0,  1;
+    -t,  0, -1;
+    -t,  0,  1];
+
+faces = [1,12,6; 1,6,2; 1,2,8; 1,8,11; 1,11,12;
+    2,6,10; 6,12,5; 12,11,3; 11,8,7; 8,2,9;
+    4,10,5; 4,5,3; 4,3,7; 4,7,9; 4,9,10;
+    5,10,6; 3,5,12; 7,3,11; 9,7,8; 10,9,2];
+
+V = verts ./ vecnorm(verts, 2, 2); % normalize
+F = faces;
+
+for i = 1:subdivisions
+    [F, V] = subdivide(F, V);
+    V = V ./ vecnorm(V, 2, 2);  % re-normalize to unit sphere
+end
+end
+
+function [F2, V2] = subdivide(F, V)
+midpoint = containers.Map('KeyType','char','ValueType','int32');
+V2 = V;
+F2 = zeros(size(F,1)*4, 3);
+vidx = size(V,1);
+
+for i = 1:size(F,1)
+    tri = F(i,:);
+    a = getMid(tri(1), tri(2), V, midpoint, vidx); vidx = max(vidx, a);
+    b = getMid(tri(2), tri(3), V, midpoint, vidx); vidx = max(vidx, b);
+    c = getMid(tri(3), tri(1), V, midpoint, vidx); vidx = max(vidx, c);
+    F2((i-1)*4 + (1:4), :) = [
+        tri(1) a c;
+        tri(2) b a;
+        tri(3) c b;
+        a b c];
+end
+
+    function idx = getMid(i1, i2, V, map, ~)
+        key = sprintf('%d-%d', min(i1,i2), max(i1,i2));
+        if map.isKey(key)
+            idx = map(key);
+        else
+            newV = (V(i1,:) + V(i2,:))/2;
+            V2(end+1,:) = newV;
+            idx = size(V2,1);
+            map(key) = idx;
+        end
+    end
 end
