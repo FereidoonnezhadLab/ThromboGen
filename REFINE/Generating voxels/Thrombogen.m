@@ -535,13 +535,12 @@ map_to_matrix = @(coords) round((coords - crop_min) / Resolution) + 1;
 % ==========================================================
 % Section 15: Compute Porosity and Composition
 % ==========================================================
-Fibrin_diamter = 2*fibrin_radius;
-platelet_diamter = 2 * platelet_radius / (Window_size_crop / Croped_clot_dim);
-Fibrin_volume = bond_length_total * pi * (Fibrin_diamter / 2)^2;
-Platelet_volume = num_platelets_output * (4/3) * pi * (platelet_diamter / 2)^3;
-RBC_volume = nnz(ClotMatrix(:) == 1);
+Fibrin_volume = bond_length_total * pi * fibrin_radius^2;
+resolution = Window_size_crop/Croped_clot_dim;
+Platelet_volume = nnz(ClotMatrix(:) == 3)*(resolution^3);
+RBC_volume = nnz(ClotMatrix(:) == 1)*(resolution^3);
 composition = RBC_volume / (RBC_volume + Fibrin_volume + Platelet_volume);
-porosity = 1 - ((RBC_volume + Fibrin_volume + Platelet_volume) / Croped_clot_dim^3);
+porosity = 1 - ((RBC_volume + Fibrin_volume + Platelet_volume) / Window_size_crop^3);
 
 % % % % % ==========================================================
 % % % % % Section 16: Write LAMMPS DATA file for OVITO (full shapes)
