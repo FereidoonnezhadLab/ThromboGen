@@ -78,9 +78,7 @@ afterEach(q, @(~) updateProgress());
 
 parfor ii = 1:Ncoords
     C = squeeze(ClotMatrix(coordinate_types(ii),rnd,:,:,:));
-    [ax,ang,C] = apply_random_rotation(C);
-    assigned_mat(ii,:,:) = rotate_response_matrix( ...
-        squeeze(Voxel_responses(coordinate_types(ii),rnd,:,:)),ax,ang);
+    assigned_mat(ii,:,:) = squeeze(Voxel_responses(coordinate_types(ii),rnd,:,:)); %#ok<*PFBNS>
     abs_vals(ii) = down_sample_apply_parameter(C,0.06,23,0,0.5,2*floor(voxel_sz/1e-6));
     scat_vals(ii) = down_sample_apply_parameter(C,0.125,85,0.06,0.125,2*floor(voxel_sz/1e-6));
     refr_vals(ii) = down_sample_apply_parameter(C,1.345,1.395,1.575,1.375,2*floor(voxel_sz/1e-6));
@@ -198,31 +196,6 @@ fy = max(min(round((y-0.5)*s+0.5),newSz),1);
 fz = max(min(round((z-0.5)*s+0.5),newSz),1);
 end
 
-function [ax, angle, rotated_matrix] = apply_random_rotation(clot_matrix)
-rotations = [0, 90, 180, 270];
-ax = randi(3); % Random axis (1=x, 2=y, 3=z)
-angle = rotations(randi(4));
-
-switch ax
-    case 1  % Rotate around X-axis
-        for i = 1:(angle / 90)
-            clot_matrix = permute(clot_matrix, [1, 3, 2]); % Swap Y and Z
-            clot_matrix = flip(clot_matrix, 2); % Flip along Y
-        end
-    case 2  % Rotate around Y-axis
-        for i = 1:(angle / 90)
-            clot_matrix = permute(clot_matrix, [3, 2, 1]); % Swap X and Z
-            clot_matrix = flip(clot_matrix, 1); % Flip along X
-        end
-    case 3  % Rotate around Z-axis
-        for i = 1:(angle / 90)
-            clot_matrix = permute(clot_matrix, [2, 1, 3]); % Swap X and Y
-            clot_matrix = flip(clot_matrix, 2); % Flip along Y
-        end
-end
-rotated_matrix = clot_matrix;
-end
-
 function DownsampledMatrix = down_sample_apply_parameter(ClotMatrix, ...
     param_empty, param_rbc, param_fibrin, param_platelet, downsample_factor)
 % 1) Replace codes in ClotMatrix with corresponding parameter values
@@ -261,34 +234,3 @@ DownsampledMatrix = squeeze(mean(ParameterMatrix, [1 2 3]));
 
 end
 
-function rotated_response = rotate_response_matrix(response_matrix, ax, angle)
-response_matrix = squeeze(response_matrix); % Ensure it's 6xN
-
-% Ensure the input is 6 rows corresponding to [x, -x, y, -y, z, -z]
-if size(response_matrix, 1) ~= 6
-    error('Input response_matrix must have 6 rows.');
-end
-
-% Define lookup table for row permutations
-rotation_map = struct(...
-    'x_90',  [1, 2, 5, 6, 4, 3], ...
-    'x_180', [1, 2, 4, 3, 6, 5], ...
-    'x_270', [1, 2, 6, 5, 3, 4], ...
-    'y_90',  [6, 5, 3, 4, 1, 2], ...
-    'y_180', [2, 1, 3, 4, 6, 5], ...
-    'y_270', [5, 6, 3, 4, 2, 1], ...
-    'z_90',  [3, 4, 2, 1, 5, 6], ...
-    'z_180', [2, 1, 4, 3, 5, 6], ...
-    'z_270', [4, 3, 1, 2, 5, 6] ...
-    );
-
-% Create key for lookup
-key = sprintf('%c_%d', 'x' + (ax - 1), angle);
-
-% Apply rotation if valid, otherwise keep original order
-if isfield(rotation_map, key)
-    rotated_response = response_matrix(rotation_map.(key), :);
-else
-    rotated_response = response_matrix; % No rotation if angle is not 90, 180, or 270
-end
-end
