@@ -10,19 +10,19 @@ go_forward = false;
 
 rng(seed); % Set random seed for reproducibility
 % Define physical and simulation parameters
-numSpheres = randi(500);
-max_diameter_factor = 0.5*rand();
-clot_volume = 4e7;
-Window_size = 100; % Simulation domain size (µm)
-Window_size_crop = 72; % Cropping size (µm)
-Croped_clot_dim = 144; % Matrix resolution per dimension
+numSpheres = 200;
+max_diameter_factor = 0.8;
+clot_volume = 6e7;
+Window_size = 150; % Simulation domain size (µm)
+Window_size_crop = 120; % Cropping size (µm)
+Croped_clot_dim = 240; % Matrix resolution per dimension
 Resolution = Window_size_crop / Croped_clot_dim; % µm per voxel
-platelet_ratio = rand();
-fibrin_concentration = 3; % g/L
+platelet_ratio = 0.6;
+fibrin_concentration = 0.8; % g/L
 voxel_volume = Window_size_crop^3;
 density_threshold = 0.001;
 platelet_radius = 1.5; %(um)
-rbc_filling_factor = 0.5+0.5*rand();
+rbc_filling_factor = 1;
 angle_balancing_weight = 1;
 
 % Interpolation constants for physical properties
@@ -112,7 +112,7 @@ fibrin_volume_um3 = (fibrin_concentration_um3 / fibrin_density) * effective_fibr
 % Section 3: Estimate Bond Length and Node Count
 % ==========================================================
 % Estimate number of points from volume and mean bond length
-fibrin_radius = 0.135 / 2; % um
+fibrin_radius = 0.15 / 2; % um
 % Total bond length required
 total_bond_length = fibrin_volume_um3 / (pi * fibrin_radius^2);
 % Calculate target mean bond length and estimate the number of required nodes
@@ -299,57 +299,57 @@ for iteration = 1:max_iterations
 
     % Add directional alignment force
     directional_forces = zeros(size(forces));
-    for i = 1:size(bonds, 1)
-        p1 = bonds(i, 1);
-        p2 = bonds(i, 2);
-        bond_vector = Points(p2, :) - Points(p1, :);
-        bond_vector_normalized = bond_vector / norm(bond_vector);
-
-        % Calculate directional force as a projection onto the preferred direction
-        alignment_component = dot(bond_vector_normalized, preferred_direction);
-        alignment_force = direction_weight * alignment_component * preferred_direction;
-
-        % Apply directional force
-        directional_forces(p1, :) = directional_forces(p1, :) + alignment_force;
-        directional_forces(p2, :) = directional_forces(p2, :) - alignment_force;
-    end
+    % for i = 1:size(bonds, 1)
+    %     p1 = bonds(i, 1);
+    %     p2 = bonds(i, 2);
+    %     bond_vector = Points(p2, :) - Points(p1, :);
+    %     bond_vector_normalized = bond_vector / norm(bond_vector);
+    %
+    %     % Calculate directional force as a projection onto the preferred direction
+    %     alignment_component = dot(bond_vector_normalized, preferred_direction);
+    %     alignment_force = direction_weight * alignment_component * preferred_direction;
+    %
+    %     % Apply directional force
+    %     directional_forces(p1, :) = directional_forces(p1, :) + alignment_force;
+    %     directional_forces(p2, :) = directional_forces(p2, :) - alignment_force;
+    % end
 
     % Balancing force for angles
     angle_forces = zeros(size(forces));
 
     % For each point, try to equalize angles between bonds
-    for i = 1:size(Points, 1)
-        connected_bonds = find(bonds(:,1) == i | bonds(:,2) == i);
-        if numel(connected_bonds) < 2
-            continue; % Not enough bonds to calculate angles
-        end
-
-        vectors = zeros(numel(connected_bonds), 3);
-        for j = 1:numel(connected_bonds)
-            b = bonds(connected_bonds(j), :);
-            other = b(b ~= i);
-            vectors(j, :) = Points(other, :) - Points(i, :);
-            vectors(j, :) = vectors(j, :) / norm(vectors(j, :));
-        end
-
-        % Compute pairwise angles
-        for j = 1:size(vectors, 1)-1
-            for k = j+1:size(vectors,1)
-                v1 = vectors(j, :);
-                v2 = vectors(k, :);
-                angle = acos(dot(v1, v2));
-                ideal_angle = 2*pi / size(vectors, 1);
-                angle_diff = angle - ideal_angle;
-                torque = cross(v1, v2);
-                if norm(torque) > 0
-                    torque_dir = torque / norm(torque);
-                    % Small corrective force
-                    correction = angle_balancing_weight * angle_diff * torque_dir;
-                    angle_forces(i, :) = angle_forces(i, :) + correction;
-                end
-            end
-        end
-    end
+    % for i = 1:size(Points, 1)
+    %     connected_bonds = find(bonds(:,1) == i | bonds(:,2) == i);
+    %     if numel(connected_bonds) < 2
+    %         continue; % Not enough bonds to calculate angles
+    %     end
+    %
+    %     vectors = zeros(numel(connected_bonds), 3);
+    %     for j = 1:numel(connected_bonds)
+    %         b = bonds(connected_bonds(j), :);
+    %         other = b(b ~= i);
+    %         vectors(j, :) = Points(other, :) - Points(i, :);
+    %         vectors(j, :) = vectors(j, :) / norm(vectors(j, :));
+    %     end
+    %
+    %     % Compute pairwise angles
+    %     for j = 1:size(vectors, 1)-1
+    %         for k = j+1:size(vectors,1)
+    %             v1 = vectors(j, :);
+    %             v2 = vectors(k, :);
+    %             angle = acos(dot(v1, v2));
+    %             ideal_angle = 2*pi / size(vectors, 1);
+    %             angle_diff = angle - ideal_angle;
+    %             torque = cross(v1, v2);
+    %             if norm(torque) > 0
+    %                 torque_dir = torque / norm(torque);
+    %                 % Small corrective force
+    %                 correction = angle_balancing_weight * angle_diff * torque_dir;
+    %                 angle_forces(i, :) = angle_forces(i, :) + correction;
+    %             end
+    %         end
+    %     end
+    % end
 
 
     % Total force = original force + directional force + angle_force
@@ -527,7 +527,7 @@ map_to_matrix = @(coords) round((coords - crop_min) / Resolution) + 1;
 % ==========================================================
 % Section 13: Insert RBCs
 % ==========================================================
-[ClotMatrix, rbc_points_all] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, map_to_matrix,rbc_filling_factor);
+[ClotMatrix, rbc_points_all,rbc_indices] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, map_to_matrix,rbc_filling_factor);
 % ==========================================================
 % Section 14: Insert Platelets
 % ==========================================================
@@ -535,71 +535,149 @@ map_to_matrix = @(coords) round((coords - crop_min) / Resolution) + 1;
 % ==========================================================
 % Section 15: Compute Porosity and Composition
 % ==========================================================
-Fibrin_volume = bond_length_total * pi * fibrin_radius^2;
-resolution = Window_size_crop/Croped_clot_dim;
-Platelet_volume = nnz(ClotMatrix(:) == 3)*(resolution^3);
-RBC_volume = nnz(ClotMatrix(:) == 1)*(resolution^3);
+platelet_diamter = 2 * platelet_radius / (Window_size_crop / Croped_clot_dim);
+Fibrin_volume = bond_length_total * pi * (fibrin_radius)^2;
+Platelet_volume = num_platelets_output * (4/3) * pi * (platelet_diamter / 2)^3;
+RBC_volume = nnz(ClotMatrix(:) == 1);
 composition = RBC_volume / (RBC_volume + Fibrin_volume + Platelet_volume);
-porosity = 1 - ((RBC_volume + Fibrin_volume + Platelet_volume) / Window_size_crop^3);
+porosity = 1 - ((RBC_volume + Fibrin_volume + Platelet_volume) / Croped_clot_dim^3);
 
-% % % % % ==========================================================
-% % % % % Section 16: Write LAMMPS DATA file for OVITO (full shapes)
-% % % % % ==========================================================
-% % % % outputFile = sprintf('clot_%s_%dpts_%dbonds.dat', ...
-% % % %     datestr(now,'yyyymmdd_HHMM'), size(Points,1), size(bonds,1)); %#ok<TNOW1>
-% % % % 
-% % % % % Center everything
-% % % % all_coords = [Points; rbc_points_all; platelet_centers];
-% % % % box_padding = 10;
-% % % % min_xyz = min(all_coords, [], 1) - box_padding;
-% % % % max_xyz = max(all_coords, [], 1) + box_padding;
-% % % % center_shift = mean([min_xyz; max_xyz]);
-% % % % 
-% % % % Points          = Points - center_shift;
-% % % % rbc_points_all  = rbc_points_all - center_shift;
-% % % % platelet_centers = platelet_centers - center_shift;
-% % % % 
-% % % % % Atom table
-% % % % nFibrin = size(Points, 1);
-% % % % nRBC    = size(rbc_points_all, 1);
-% % % % nPLT    = size(platelet_centers, 1);
-% % % % nAtoms  = nFibrin + nRBC + nPLT;
-% % % % nBonds  = size(bonds, 1);
-% % % % 
-% % % % id   = (1:nAtoms).';
-% % % % mol  = zeros(nAtoms,1);
-% % % % type = [ ...
-% % % %     ones(nFibrin,1);     % 1 = fibrin
-% % % %     2 * ones(nRBC,1);    % 2 = RBC voxels
-% % % %     3 * ones(nPLT,1)];   % 3 = platelets
-% % % % 
-% % % % coord = [Points; rbc_points_all; platelet_centers];
-% % % % Atoms = [id mol type coord];
-% % % % 
-% % % % Bonds = [(1:nBonds).'  ones(nBonds,1)  bonds];  % only connect fibrin
-% % % % 
-% % % % % Write file
-% % % % fid = fopen(outputFile,'w');
-% % % % fprintf(fid,"LAMMPS data file – fibrin, RBC shape, platelet centers\n\n");
-% % % % fprintf(fid,"%d atoms\n%d bonds\n\n", nAtoms, nBonds);
-% % % % fprintf(fid,"3 atom types\n1 bond types\n\n");
-% % % % fprintf(fid,"%g %g xlo xhi\n%g %g ylo yhi\n%g %g zlo zhi\n\n", ...
-% % % %     min(coord(:,1))-box_padding, max(coord(:,1))+box_padding, ...
-% % % %     min(coord(:,2))-box_padding, max(coord(:,2))+box_padding, ...
-% % % %     min(coord(:,3))-box_padding, max(coord(:,3))+box_padding);
-% % % % 
-% % % % fprintf(fid,"Masses\n\n");
-% % % % fprintf(fid,"1 1.0\n2 1.0\n3 1.0\n\n");
-% % % % 
-% % % % fprintf(fid,"Atoms # atomic\n\n");
-% % % % fprintf(fid,"%d %d %d %.6f %.6f %.6f\n", Atoms.');
-% % % % 
-% % % % fprintf(fid,"\nBonds\n\n");
-% % % % fprintf(fid,"%d %d %d %d\n", Bonds.');
-% % % % fclose(fid);
-% % % % 
-% % % % fprintf('✅ LAMMPS data file written to %s\n', outputFile);
+% % % Section 13: Export clot geometry for Blender
+% % % Bezier fibrin strands, RBC alpha surfaces, platelet spheres
+% % % ==========================================================
+% % % --- Crop points to export only within crop_min and crop_max ---
+in_crop_Points = all(Points >= crop_min & Points <= crop_max, 2);
+Points_cropped = Points(in_crop_Points, :);
+index_map = zeros(size(Points,1),1);
+index_map(in_crop_Points) = 1:nnz(in_crop_Points);
 
+% Filter bonds to retain only those with both nodes inside cropped region
+valid_bonds = all(in_crop_Points(bonds), 2);
+bonds_cropped = [index_map(bonds(valid_bonds,1)), index_map(bonds(valid_bonds,2))];
+
+% Crop RBC points
+rbc_mask = all(rbc_points_all >= crop_min & rbc_points_all <= crop_max, 2);
+rbc_points_cropped = rbc_points_all(rbc_mask, :);
+
+% Crop platelet centers
+platelet_mask = all(platelet_centers >= crop_min & platelet_centers <= crop_max, 2);
+platelet_centers_cropped = platelet_centers(platelet_mask, :);
+
+% Recenter cropped objects
+all_coords = [Points_cropped; rbc_points_cropped; platelet_centers_cropped];
+center_shift = mean([crop_min; crop_max]);
+Points_cropped = Points_cropped - center_shift;
+rbc_points_cropped = rbc_points_cropped - center_shift;
+platelet_centers_cropped = platelet_centers_cropped - center_shift;
+
+
+% --- Prepare RBC clusters ---
+rbc_clusters = cell(size(rbc_indices));
+valid_mask = all(rbc_points_all >= crop_min & rbc_points_all <= crop_max, 2);
+cropped_idx_map = find(valid_mask); % maps index in cropped to full
+
+for i = 1:length(rbc_indices)
+    cluster_indices = rbc_indices{i};
+    % Keep only the points that were included in the cropped RBC list
+    valid_in_cluster = ismember(cluster_indices, cropped_idx_map);
+    if any(valid_in_cluster)
+        actual_indices = cluster_indices(valid_in_cluster);
+        rbc_clusters{i} = rbc_points_all(actual_indices, :) - center_shift;
+    else
+        rbc_clusters{i} = []; % Skip completely excluded clusters
+    end
+end
+
+
+% --- Parallelize Fibrin Bezier tubes ---
+tube_radius = 0.1;
+n_segments = 8;
+n_samples = 20;
+num_bonds = size(bonds_cropped, 1);  % Use cropped bonds
+
+tube_vertices = cell(num_bonds, 1);
+tube_faces    = cell(num_bonds, 1);
+tube_colors   = cell(num_bonds, 1);
+
+parfor i = 1:num_bonds
+    p0 = Points_cropped(bonds_cropped(i,1), :);
+    p2 = Points_cropped(bonds_cropped(i,2), :);
+    control = (p0 + p2)/2 + (rand(1,3)-0.5)*1;
+    t = linspace(0,1,n_samples)';
+    curve = (1 - t).^2 .* p0 + 2*(1 - t).*t .* control + t.^2 .* p2;
+    [v, f] = tubeAlongCurve(curve, tube_radius, n_segments);
+    tube_vertices{i} = v;
+    tube_faces{i}    = f;
+    tube_colors{i}   = repmat([255 255 255], size(v,1), 1);
+end
+
+% --- Parallelize RBC alpha surfaces ---
+rbc_vertices = cell(length(rbc_clusters), 1);
+rbc_faces    = cell(length(rbc_clusters), 1);
+rbc_colors   = cell(length(rbc_clusters), 1);
+
+parfor i = 1:length(rbc_clusters)
+    pts = rbc_clusters{i};
+    if size(pts,1) < 4
+        continue;
+    end
+    try
+        shp = alphaShape(pts, 1.5);
+        [f, v] = boundaryFacets(shp);
+    catch
+        [~, f, v] = convhull(pts);
+    end
+    rbc_vertices{i} = v;
+    rbc_faces{i}    = f;
+    rbc_colors{i}   = repmat([255 0 0], size(v,1), 1);
+end
+
+% --- Parallelize Platelet spheres ---
+[sp_v, sp_f] = icosphere(2);
+sp_v = sp_v * 0.75;
+num_platelets = size(platelet_centers_cropped, 1);
+
+platelet_vertices = cell(num_platelets, 1);
+platelet_faces    = cell(num_platelets, 1);
+platelet_colors   = cell(num_platelets, 1);
+
+parfor i = 1:num_platelets
+    v = sp_v + platelet_centers_cropped(i, :);  % <-- use _cropped version
+    f = sp_f;
+    platelet_vertices{i} = v;
+    platelet_faces{i}    = f;
+    platelet_colors{i}   = repmat([0 0 255], size(v,1), 1);
+end
+
+% --- Merge all meshes together efficiently ---
+
+% Fibrin
+all_v = vertcat(tube_vertices{:});
+offsets = cumsum([0; cellfun(@(v) size(v,1), tube_vertices(1:end-1))]);
+all_f = cell2mat(cellfun(@(f, o) f + o, tube_faces, num2cell(offsets), 'UniformOutput', false));
+all_c = vertcat(tube_colors{:});
+
+% RBCs
+rbc_v = vertcat(rbc_vertices{:});
+offsets = cumsum([0; cellfun(@(v) size(v,1), rbc_vertices(1:end-1))]);
+rbc_f = cell2mat(cellfun(@(f, o) f + o, rbc_faces, num2cell(offsets), 'UniformOutput', false));
+rbc_c = vertcat(rbc_colors{:});
+
+% Platelets
+pl_v = vertcat(platelet_vertices{:});
+offsets = cumsum([0; cellfun(@(v) size(v,1), platelet_vertices(1:end-1))]);
+pl_f = cell2mat(cellfun(@(f, o) f + o, platelet_faces, num2cell(offsets), 'UniformOutput', false));
+pl_c = vertcat(platelet_colors{:});
+
+% Final mesh
+fv_all.vertices = [all_v; rbc_v; pl_v];
+fv_all.faces    = [all_f; rbc_f + size(all_v,1); pl_f + size(all_v,1) + size(rbc_v,1)];
+fv_all.colors   = [all_c; rbc_c; pl_c];
+
+% --- Write to PLY ---
+ply_filename = sprintf('clot_cropped_%s.ply', datestr(now,'yyyymmdd_HHMM')); %#ok<TNOW1>
+writePLYMesh(fv_all.vertices, fv_all.faces, fv_all.colors, ply_filename);
+fprintf('✅ Cropped Blender mesh written to %s\n', ply_filename);
 
 end
 
@@ -737,10 +815,11 @@ end
 % ==========================================================
 % Helper Function: place_rbc_in_spheres
 % ==========================================================
-function [ClotMatrix, rbc_points_all] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, map_to_matrix,rbc_filling_factor)
+function [ClotMatrix, rbc_points_all,rbc_indices] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, map_to_matrix,rbc_filling_factor)
 % Parameters
 RBC_diameter_noncompacted = 8; % in um
 rbc_points_all = [];
+rbc_indices = {};  % Store indices for each RBC
 
 for i = 1:length(sphere_radii)
     radius_sphere = sphere_radii(i);
@@ -774,7 +853,9 @@ for i = 1:length(sphere_radii)
         rot = rand(1, 3) * pi;
         rbc_pts = generate_rbc_voxels(center, rot, P, Q, R);
         if size(rbc_pts, 1) >= 4
+            offset = size(rbc_points_all, 1);
             rbc_points_all = [rbc_points_all; rbc_pts];
+            rbc_indices{end+1} = offset + (1:size(rbc_pts, 1));
         end
     end
 end
@@ -790,7 +871,8 @@ valid_indices = rbc_idx_array(valid_mask, :);
 lin_idx = sub2ind([Croped_clot_dim, Croped_clot_dim, Croped_clot_dim], valid_indices(:,1), valid_indices(:,2), valid_indices(:,3));
 
 % Assign RBCs to matrix in one go
-ClotMatrix(lin_idx) = 1;
+empty_voxel_mask = ClotMatrix(lin_idx) == 0;
+ClotMatrix(lin_idx(empty_voxel_mask)) = 1;
 
 end
 % ==========================================================
@@ -916,7 +998,8 @@ for i = 1:size(bonds, 1)
     valid_vox = all(idx_vox > 0, 2) & all(idx_vox <= Croped_clot_dim, 2);
     idx_vox = idx_vox(valid_vox, :);
     lin_idx = sub2ind([Croped_clot_dim, Croped_clot_dim, Croped_clot_dim], idx_vox(:,1), idx_vox(:,2), idx_vox(:,3));
-    ClotMatrix(lin_idx) = 2; % Mark fibrin voxels
+    empty_voxel_mask = ClotMatrix(lin_idx) == 0;
+    ClotMatrix(lin_idx(empty_voxel_mask)) = 2;
 end
 end
 % ==========================================================
@@ -954,8 +1037,136 @@ for i = 1:num_platelets_to_plot
             valid_vox = all(idx_vox > 0, 2) & all(idx_vox <= Croped_clot_dim, 2);
             idx_vox = idx_vox(valid_vox, :);
             lin_idx = sub2ind([Croped_clot_dim, Croped_clot_dim, Croped_clot_dim], idx_vox(:,1), idx_vox(:,2), idx_vox(:,3));
-            ClotMatrix(lin_idx) = 3; % Platelet voxel
+            empty_voxel_mask = ClotMatrix(lin_idx) == 0;
+            ClotMatrix(lin_idx(empty_voxel_mask)) = 3;
         end
     end
 end
+end
+
+% ==========================================================
+% Helper Function: tubeAlongCurve
+% ==========================================================
+function [V, F] = tubeAlongCurve(P, radius, seg)
+N = size(P,1);
+V = []; F = [];
+for i = 1:N
+    t = max(i-1,1); u = min(i+1,N);
+    dir = P(u,:) - P(t,:);
+    dir = dir / norm(dir + 1e-6);
+    [cx, cy, ~] = cylinder(radius, seg);
+    ring = [cx(1, 1:end-1)', cy(1, 1:end-1)', zeros(seg,1)];
+    R = vrrotvec2mat(vrrotvec([0 0 1], dir));
+    ring = (R * ring')' + P(i,:);
+    V = [V; ring];
+    if i > 1
+        idx = size(V,1) - 2*seg;
+        for j = 1:seg
+            j2 = mod(j,seg)+1;
+            F = [F; idx+j, idx+seg+j, idx+seg+j2; idx+j, idx+seg+j2, idx+j2];
+        end
+    end
+end
+end
+% ==========================================================
+% Helper Function: writePLYMesh
+% ==========================================================
+function writePLYMesh(vertices, faces, colors, filename)
+
+% Start file and write header
+fid = fopen(filename, 'w');
+fprintf(fid, 'ply\nformat ascii 1.0\n');
+fprintf(fid, 'element vertex %d\n', size(vertices,1));
+fprintf(fid, 'property float x\nproperty float y\nproperty float z\n');
+fprintf(fid, 'property uchar red\nproperty uchar green\nproperty uchar blue\n');
+fprintf(fid, 'element face %d\n', size(faces,1));
+fprintf(fid, 'property list uchar int vertex_indices\n');
+fprintf(fid, 'end_header\n');
+fclose(fid); % close for now; we'll append below
+
+% === Build vertex lines in parallel
+vertex_lines = strings(size(vertices,1), 1);
+parfor i = 1:size(vertices,1)
+    vertex_lines(i) = sprintf('%.4f %.4f %.4f %d %d %d\n', ...
+        vertices(i,1), vertices(i,2), vertices(i,3), ...
+        colors(i,1), colors(i,2), colors(i,3)); %#ok<PFBNS>
+end
+
+% === Build face lines in parallel
+face_lines = strings(size(faces,1), 1);
+parfor i = 1:size(faces,1)
+    face_lines(i) = sprintf('3 %d %d %d\n', ...
+        faces(i,1)-1, faces(i,2)-1, faces(i,3)-1);
+end
+
+% === Concatenate all lines and write to file
+fid = fopen(filename, 'a'); % append mode
+fprintf(fid, '%s', join(vertex_lines, ''));
+fprintf(fid, '%s', join(face_lines, ''));
+fclose(fid);
+
+end
+
+
+%% icoshpehre
+function [V,F] = icosphere(subdivisions)
+% Create an icosphere mesh (triangulated sphere)
+t = (1 + sqrt(5)) / 2;
+
+verts = [-1,  t,  0;
+    1,  t,  0;
+    -1, -t,  0;
+    1, -t,  0;
+    0, -1,  t;
+    0,  1,  t;
+    0, -1, -t;
+    0,  1, -t;
+    t,  0, -1;
+    t,  0,  1;
+    -t,  0, -1;
+    -t,  0,  1];
+
+faces = [1,12,6; 1,6,2; 1,2,8; 1,8,11; 1,11,12;
+    2,6,10; 6,12,5; 12,11,3; 11,8,7; 8,2,9;
+    4,10,5; 4,5,3; 4,3,7; 4,7,9; 4,9,10;
+    5,10,6; 3,5,12; 7,3,11; 9,7,8; 10,9,2];
+
+V = verts ./ vecnorm(verts, 2, 2); % normalize
+F = faces;
+
+for i = 1:subdivisions
+    [F, V] = subdivide(F, V);
+    V = V ./ vecnorm(V, 2, 2);  % re-normalize to unit sphere
+end
+end
+
+function [F2, V2] = subdivide(F, V)
+midpoint = containers.Map('KeyType','char','ValueType','int32');
+V2 = V;
+F2 = zeros(size(F,1)*4, 3);
+vidx = size(V,1);
+
+for i = 1:size(F,1)
+    tri = F(i,:);
+    a = getMid(tri(1), tri(2), V, midpoint, vidx); vidx = max(vidx, a);
+    b = getMid(tri(2), tri(3), V, midpoint, vidx); vidx = max(vidx, b);
+    c = getMid(tri(3), tri(1), V, midpoint, vidx); vidx = max(vidx, c);
+    F2((i-1)*4 + (1:4), :) = [
+        tri(1) a c;
+        tri(2) b a;
+        tri(3) c b;
+        a b c];
+end
+
+    function idx = getMid(i1, i2, V, map, ~)
+        key = sprintf('%d-%d', min(i1,i2), max(i1,i2));
+        if map.isKey(key)
+            idx = map(key);
+        else
+            newV = (V(i1,:) + V(i2,:))/2;
+            V2(end+1,:) = newV;
+            idx = size(V2,1);
+            map(key) = idx;
+        end
+    end
 end
