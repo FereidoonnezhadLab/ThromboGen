@@ -4,7 +4,7 @@
 
 clear; clc; close all;
 seed = 162;
-for counter = 108
+for counter = 1:10
     go_forward = false;
     seed = seed+counter;
     while ~ go_forward
@@ -82,38 +82,37 @@ for counter = 108
             end
         end
 
-        % % % % % Create figure
-        % % % % figureHandle = figure;
-        % % % % 
-        % % % % % Maximize the figure window
-        % % % % set(figureHandle, 'WindowState', 'maximized');
-        % % % % % Set the background color to black
-        % % % % set(figureHandle, 'Color', 'k');
-        % % % % hold on
-        % % % % 
-        % % % % % Plot spheres
-        % % % % for i = 1:length(sphere_radii)
-        % % % %     [x_sphere, y_sphere, z_sphere] = sphere(20);  % Create a sphere
-        % % % %     x_sphere = x_sphere * sphere_radii(i) + sphere_centers(i, 1);
-        % % % %     y_sphere = y_sphere * sphere_radii(i) + sphere_centers(i, 2);
-        % % % %     z_sphere = z_sphere * sphere_radii(i) + sphere_centers(i, 3);
-        % % % %     plot3(x_sphere, y_sphere, z_sphere);
-        % % % % end
-        % % % % axis equal;
-        % % % % grid on
-        % % % % grid minor
-        % % % % % Set font properties and axis color to white
-        % % % % set(gca, 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', ...
-        % % % %     'XColor', 'w', 'YColor', 'w', 'ZColor', 'w', 'Color', 'k'); % 'Color' sets the axis background color, 'XColor' and 'YColor' set axis line and tick color
-        % % % % 
-        % % % % % Set title, xlabel, ylabel with the same font settings
-        % % % % title('Inclusion volumes', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', 'Color', 'White');
-        % % % % xlabel('X(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', 'Color', 'White');
-        % % % % ylabel('Y(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', 'Color', 'White');
-        % % % % zlabel('Z(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', 'Color', 'White');
-        % % % % view(3)
-        % % % % hold off
-        % % % % % % %(0.00001);
+        % Create figure
+        figureHandle = figure;
+
+        % Maximize the figure window
+        set(figureHandle, 'WindowState', 'maximized');
+        % Set the background color to black
+        set(figureHandle, 'Color', 'k');
+        hold on
+
+        % Plot spheres
+        for i = 1:length(sphere_radii)
+            [x_sphere, y_sphere, z_sphere] = sphere(20);  % Create a sphere
+            x_sphere = x_sphere * sphere_radii(i) + sphere_centers(i, 1);
+            y_sphere = y_sphere * sphere_radii(i) + sphere_centers(i, 2);
+            z_sphere = z_sphere * sphere_radii(i) + sphere_centers(i, 3);
+            plot3(x_sphere, y_sphere, z_sphere);
+        end
+        axis equal;
+        grid on
+        grid minor
+        % Set font properties and axis color to white
+        set(gca, 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', ...
+            'XColor', 'w', 'YColor', 'w', 'ZColor', 'w', 'Color', 'k'); % 'Color' sets the axis background color, 'XColor' and 'YColor' set axis line and tick color
+
+        % Set title, xlabel, ylabel with the same font settings
+        title('Inclusion volumes', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', 'Color', 'White');
+        xlabel('X(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', 'Color', 'White');
+        ylabel('Y(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', 'Color', 'White');
+        zlabel('Z(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', 'Color', 'White');
+        view(3)
+        hold off
 
 
 
@@ -188,44 +187,44 @@ for counter = 108
             Points = [Points; cluster_points];
         end
 
-        % density = plot_density_based_points(Points, 10,false);
-        % if ~isempty(density)
-        % std_density = std(density(:,2)/max(density(:,2)));
-        % else
-        % std_density = 0;
-        % end
+        density = plot_density_based_points(Points, 10,false);
+        if ~isempty(density)
+            std_density = std(density(:,2)/max(density(:,2)));
+        else
+            std_density = 0;
+        end
 
-        % if std_density > 0.25
-        % disp('Not good enough!')
-        % disp(std_density)
-        % go_forward = false;
-        % else
-        go_forward = true;
-        % end
+        if std_density > 0.25
+            disp('Not good enough!')
+            disp(std_density)
+            go_forward = false;
+        else
+            go_forward = true;
+        end
     end
 
-    % % % % % Create figure
-    % % % % figureHandle = figure;
-    % % % % % Maximize the figure window
-    % % % % set(figureHandle, 'WindowState', 'maximized');
-    % % % % % Set the background color to black
-    % % % % set(figureHandle, 'Color', 'k');
-    % % % % hold on
-    % % % % scatter3(Points(:,1), Points(:,2), Points(:,3), '.','g');
-    % % % % axis equal;
-    % % % % grid on
-    % % % % grid minor
-    % % % % % Set font properties and axis color to white
-    % % % % set(gca, 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', ...
-    % % % %     'XColor', 'w', 'YColor', 'w', 'ZColor','w', 'Color', 'k'); % 'Color' sets the axis background color, 'XColor' and 'YColor' set axis line and tick color
-    % % % % % Set title, xlabel, ylabel with the same font settings
-    % % % % title('initial node positions', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
-    % % % % xlabel('X(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
-    % % % % ylabel('Y(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
-    % % % % zlabel('Z(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
-    % % % % view(3)
-    % % % % hold off
-    % % % % %(0.1);
+    % Create figure
+    figureHandle = figure;
+    % Maximize the figure window
+    set(figureHandle, 'WindowState', 'maximized');
+    % Set the background color to black
+    set(figureHandle, 'Color', 'k');
+    hold on
+    scatter3(Points(:,1), Points(:,2), Points(:,3), '.','g');
+    axis equal;
+    grid on
+    grid minor
+    % Set font properties and axis color to white
+    set(gca, 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', ...
+        'XColor', 'w', 'YColor', 'w', 'ZColor','w', 'Color', 'k'); % 'Color' sets the axis background color, 'XColor' and 'YColor' set axis line and tick color
+    % Set title, xlabel, ylabel with the same font settings
+    title('initial node positions', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
+    xlabel('X(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
+    ylabel('Y(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
+    zlabel('Z(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
+    view(3)
+    hold off
+    %(0.1);
     % ==========================================================
     % Section 5: Generate Bonds Based on Valency Distribution
     % ==========================================================
@@ -257,32 +256,32 @@ for counter = 108
     end
 
     % Create figure
-    % % % % figureHandle = figure;
-    % % % % % Maximize the figure window
-    % % % % set(figureHandle, 'WindowState', 'maximized');
-    % % % % % Set the background color to black
-    % % % % set(figureHandle, 'Color', 'k');
-    % % % % hold on
-    % % % % scatter3(Points(:,1), Points(:,2), Points(:,3), '.','g');
-    % % % % for i = 1:size(bonds, 1)
-    % % % %     %plot3([Points(bonds(i, 1), 1), Points(bonds(i, 2), 1)], ...
-    % % % %         % [Points(bonds(i, 1), 2), Points(bonds(i, 2), 2)], ...
-    % % % %         % [Points(bonds(i, 1), 3), Points(bonds(i, 2), 3)], 'y-');
-    % % % %     %(1e-12);
-    % % % % end
-    % % % % axis equal;
-    % % % % grid on
-    % % % % grid minor
-    % % % % % Set font properties and axis color to white
-    % % % % set(gca, 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', ...
-    % % % %     'XColor', 'w', 'YColor', 'w', 'ZColor','w', 'Color', 'k'); % 'Color' sets the axis background color, 'XColor' and 'YColor' set axis line and tick color
-    % % % % % Set title, xlabel, ylabel with the same font settings
-    % % % % title('initial bonds', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
-    % % % % xlabel('X(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
-    % % % % ylabel('Y(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
-    % % % % zlabel('Z(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
-    % % % % view(3)
-    % % % % hold off
+    figureHandle = figure;
+    % Maximize the figure window
+    set(figureHandle, 'WindowState', 'maximized');
+    % Set the background color to black
+    set(figureHandle, 'Color', 'k');
+    hold on
+    scatter3(Points(:,1), Points(:,2), Points(:,3), '.','g');
+    for i = 1:size(bonds, 1)
+        %plot3([Points(bonds(i, 1), 1), Points(bonds(i, 2), 1)], ...
+        % [Points(bonds(i, 1), 2), Points(bonds(i, 2), 2)], ...
+        % [Points(bonds(i, 1), 3), Points(bonds(i, 2), 3)], 'y-');
+        %(1e-12);
+    end
+    axis equal;
+    grid on
+    grid minor
+    % Set font properties and axis color to white
+    set(gca, 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic', ...
+        'XColor', 'w', 'YColor', 'w', 'ZColor','w', 'Color', 'k'); % 'Color' sets the axis background color, 'XColor' and 'YColor' set axis line and tick color
+    % Set title, xlabel, ylabel with the same font settings
+    title('initial bonds', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
+    xlabel('X(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
+    ylabel('Y(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
+    zlabel('Z(um)', 'FontName', 'Calibri', 'FontSize', 24, 'FontWeight', 'bold', 'FontAngle', 'italic','Color','White');
+    view(3)
+    hold off
     % ==========================================================
     % Section 7: Strain Energy Relaxation with Balanced Penalties
     % ==========================================================
@@ -371,57 +370,57 @@ for counter = 108
 
         % Add directional alignment force
         directional_forces = zeros(size(forces));
-        % for i = 1:size(bonds, 1)
-        %     p1 = bonds(i, 1);
-        %     p2 = bonds(i, 2);
-        %     bond_vector = Points(p2, :) - Points(p1, :);
-        %     bond_vector_normalized = bond_vector / norm(bond_vector);
-        % 
-        %     % Calculate directional force as a projection onto the preferred direction
-        %     alignment_component = dot(bond_vector_normalized, preferred_direction);
-        %     alignment_force = direction_weight * alignment_component * preferred_direction;
-        % 
-        %     % Apply directional force
-        %     directional_forces(p1, :) = directional_forces(p1, :) + alignment_force;
-        %     directional_forces(p2, :) = directional_forces(p2, :) - alignment_force;
-        % end
+        for i = 1:size(bonds, 1)
+            p1 = bonds(i, 1);
+            p2 = bonds(i, 2);
+            bond_vector = Points(p2, :) - Points(p1, :);
+            bond_vector_normalized = bond_vector / norm(bond_vector);
+
+            % Calculate directional force as a projection onto the preferred direction
+            alignment_component = dot(bond_vector_normalized, preferred_direction);
+            alignment_force = direction_weight * alignment_component * preferred_direction;
+
+            % Apply directional force
+            directional_forces(p1, :) = directional_forces(p1, :) + alignment_force;
+            directional_forces(p2, :) = directional_forces(p2, :) - alignment_force;
+        end
 
         % Balancing force for angles
         angle_forces = zeros(size(forces));
 
         % % For each point, try to equalize angles between bonds
-        % for i = 1:size(Points, 1)
-        %     connected_bonds = find(bonds(:,1) == i | bonds(:,2) == i);
-        %     if numel(connected_bonds) < 2
-        %         continue; % Not enough bonds to calculate angles
-        %     end
-        % 
-        %     vectors = zeros(numel(connected_bonds), 3);
-        %     for j = 1:numel(connected_bonds)
-        %         b = bonds(connected_bonds(j), :);
-        %         other = b(b ~= i);
-        %         vectors(j, :) = Points(other, :) - Points(i, :);
-        %         vectors(j, :) = vectors(j, :) / norm(vectors(j, :));
-        %     end
-        % 
-        %     % Compute pairwise angles
-        %     for j = 1:size(vectors, 1)-1
-        %         for k = j+1:size(vectors,1)
-        %             v1 = vectors(j, :);
-        %             v2 = vectors(k, :);
-        %             angle = acos(dot(v1, v2));
-        %             ideal_angle = 2*pi / size(vectors, 1);
-        %             angle_diff = angle - ideal_angle;
-        %             torque = cross(v1, v2);
-        %             if norm(torque) > 0
-        %                 torque_dir = torque / norm(torque);
-        %                 % Small corrective force
-        %                 correction = angle_diff * torque_dir;
-        %                 angle_forces(i, :) = angle_forces(i, :) + correction;
-        %             end
-        %         end
-        %     end
-        % end
+        for i = 1:size(Points, 1)
+            connected_bonds = find(bonds(:,1) == i | bonds(:,2) == i);
+            if numel(connected_bonds) < 2
+                continue; % Not enough bonds to calculate angles
+            end
+
+            vectors = zeros(numel(connected_bonds), 3);
+            for j = 1:numel(connected_bonds)
+                b = bonds(connected_bonds(j), :);
+                other = b(b ~= i);
+                vectors(j, :) = Points(other, :) - Points(i, :);
+                vectors(j, :) = vectors(j, :) / norm(vectors(j, :));
+            end
+
+            % Compute pairwise angles
+            for j = 1:size(vectors, 1)-1
+                for k = j+1:size(vectors,1)
+                    v1 = vectors(j, :);
+                    v2 = vectors(k, :);
+                    angle = acos(dot(v1, v2));
+                    ideal_angle = 2*pi / size(vectors, 1);
+                    angle_diff = angle - ideal_angle;
+                    torque = cross(v1, v2);
+                    if norm(torque) > 0
+                        torque_dir = torque / norm(torque);
+                        % Small corrective force
+                        correction = angle_diff * torque_dir;
+                        angle_forces(i, :) = angle_forces(i, :) + correction;
+                    end
+                end
+            end
+        end
 
 
         % Total force = original force + directional force + angle_force
@@ -576,18 +575,15 @@ for counter = 108
         connection_counts(bonds(i, 1)) = connection_counts(bonds(i, 1)) + 1;
         connection_counts(bonds(i, 2)) = connection_counts(bonds(i, 2)) + 1;
     end
-
-
     % Plot valency distribution
-    % valency = connection_counts;
-    % figure;
-    % histogram(valency, 20, 'Normalization', 'pdf', 'FaceAlpha', 0.6, 'FaceColor', 'b');%
-    % 
-    % title('Valency Distribution Compared to Shifted Geometric Distribution');
-    % xlabel('Number of Connections (Valency)');
-    % ylabel('Probability Density');
-    % hold off;
-    % (0.00001);
+    valency = connection_counts;
+    figure;
+    histogram(valency, 20, 'Normalization', 'pdf', 'FaceAlpha', 0.6, 'FaceColor', 'b');%
+    title('Valency Distribution Compared to Shifted Geometric Distribution');
+    xlabel('Number of Connections (Valency)');
+    ylabel('Probability Density');
+    hold off;
+
 
 
 
@@ -605,18 +601,18 @@ for counter = 108
     directional_cosines = [];
 
     for i = 1:numBonds
-       % Find bonds connected to the current bond
-       connected_bonds = find(bonds(:, 1) == bonds(i, 2) | bonds(:, 2) == bonds(i, 2));
-       for j = 1:length(connected_bonds)
-           if connected_bonds(j) ~= i
-               % Get vectors of the two connected bonds
-               v1 = bond_vectors(i, :);
-               v2 = bond_vectors(connected_bonds(j), :);
-               % Compute the cosine of the angle between them
-               cos_theta = dot(v1, v2) / (norm(v1) * norm(v2));
-               directional_cosines = [directional_cosines; cos_theta];
-           end
-       end
+        % Find bonds connected to the current bond
+        connected_bonds = find(bonds(:, 1) == bonds(i, 2) | bonds(:, 2) == bonds(i, 2));
+        for j = 1:length(connected_bonds)
+            if connected_bonds(j) ~= i
+                % Get vectors of the two connected bonds
+                v1 = bond_vectors(i, :);
+                v2 = bond_vectors(connected_bonds(j), :);
+                % Compute the cosine of the angle between them
+                cos_theta = dot(v1, v2) / (norm(v1) * norm(v2));
+                directional_cosines = [directional_cosines; cos_theta];
+            end
+        end
     end
 
     %% Define empirical fit model: Exponential + Polynomial
@@ -630,7 +626,7 @@ for counter = 108
     % Plot histogram of directional cosines and overlay improved theoretical fit
     figure;
     histogram(directional_cosines, 50, 'Normalization', 'pdf', ...
-    'FaceAlpha', 0.6, 'FaceColor', 'b');
+        'FaceAlpha', 0.6, 'FaceColor', 'b');
     hold on;
     plot(beta_values, B_fit, 'k-', 'LineWidth', 2);
     title('Directional Cosine Distribution Between Connected Bonds');
@@ -657,112 +653,112 @@ for counter = 108
 
 
 
-% --- Center everything ---
-all_coords = [Points; rbc_points_all; platelet_centers];
-box_padding = 10;
-min_xyz = min(all_coords, [], 1) - box_padding;
-max_xyz = max(all_coords, [], 1) + box_padding;
-center_shift = mean([min_xyz; max_xyz]);
+    % --- Center everything ---
+    all_coords = [Points; rbc_points_all; platelet_centers];
+    box_padding = 10;
+    min_xyz = min(all_coords, [], 1) - box_padding;
+    max_xyz = max(all_coords, [], 1) + box_padding;
+    center_shift = mean([min_xyz; max_xyz]);
 
-Points           = Points - center_shift;
-rbc_points_all   = rbc_points_all - center_shift;
-platelet_centers = platelet_centers - center_shift;
+    Points           = Points - center_shift;
+    rbc_points_all   = rbc_points_all - center_shift;
+    platelet_centers = platelet_centers - center_shift;
 
-% --- Prepare RBC clusters ---
-rbc_clusters = cell(size(rbc_indices));
-for i = 1:length(rbc_indices)
-    rbc_clusters{i} = rbc_points_all(rbc_indices{i}, :);
-end
-
-% --- Parallelize Fibrin Bezier tubes ---
-tube_radius = 0.1;
-n_segments = 8;
-n_samples = 20;
-num_bonds = size(bonds, 1);
-
-tube_vertices = cell(num_bonds, 1);
-tube_faces    = cell(num_bonds, 1);
-tube_colors   = cell(num_bonds, 1);
-
-parfor i = 1:num_bonds
-    p0 = Points(bonds(i,1), :);
-    p2 = Points(bonds(i,2), :);
-    control = (p0 + p2)/2 + (rand(1,3)-0.5)*1;
-    t = linspace(0,1,n_samples)';
-    curve = (1 - t).^2 .* p0 + 2*(1 - t).*t .* control + t.^2 .* p2;
-    [v, f] = tubeAlongCurve(curve, tube_radius, n_segments);
-    tube_vertices{i} = v;
-    tube_faces{i}    = f;
-    tube_colors{i}   = repmat([255 255 255], size(v,1), 1);
-end
-
-% --- Parallelize RBC alpha surfaces ---
-rbc_vertices = cell(length(rbc_clusters),1);
-rbc_faces    = cell(length(rbc_clusters),1);
-rbc_colors   = cell(length(rbc_clusters),1);
-
-parfor i = 1:length(rbc_clusters)
-    pts = rbc_clusters{i};
-    if size(pts,1) < 4
-        continue;
+    % --- Prepare RBC clusters ---
+    rbc_clusters = cell(size(rbc_indices));
+    for i = 1:length(rbc_indices)
+        rbc_clusters{i} = rbc_points_all(rbc_indices{i}, :);
     end
-    try
-        shp = alphaShape(pts, 1.5);
-        [f, v] = boundaryFacets(shp);
-    catch
-        [~, f, v] = convhull(pts);
+
+    % --- Parallelize Fibrin Bezier tubes ---
+    tube_radius = 0.1;
+    n_segments = 8;
+    n_samples = 20;
+    num_bonds = size(bonds, 1);
+
+    tube_vertices = cell(num_bonds, 1);
+    tube_faces    = cell(num_bonds, 1);
+    tube_colors   = cell(num_bonds, 1);
+
+    parfor i = 1:num_bonds
+        p0 = Points(bonds(i,1), :);
+        p2 = Points(bonds(i,2), :);
+        control = (p0 + p2)/2 + (rand(1,3)-0.5)*1;
+        t = linspace(0,1,n_samples)';
+        curve = (1 - t).^2 .* p0 + 2*(1 - t).*t .* control + t.^2 .* p2;
+        [v, f] = tubeAlongCurve(curve, tube_radius, n_segments);
+        tube_vertices{i} = v;
+        tube_faces{i}    = f;
+        tube_colors{i}   = repmat([255 255 255], size(v,1), 1);
     end
-    rbc_vertices{i} = v;
-    rbc_faces{i}    = f;
-    rbc_colors{i}   = repmat([255 0 0], size(v,1), 1);
-end
 
-% --- Parallelize Platelet spheres ---
-[sp_v, sp_f] = icosphere(2);
-sp_v = sp_v * 0.75;
-num_platelets = size(platelet_centers, 1);
+    % --- Parallelize RBC alpha surfaces ---
+    rbc_vertices = cell(length(rbc_clusters),1);
+    rbc_faces    = cell(length(rbc_clusters),1);
+    rbc_colors   = cell(length(rbc_clusters),1);
 
-platelet_vertices = cell(num_platelets, 1);
-platelet_faces    = cell(num_platelets, 1);
-platelet_colors   = cell(num_platelets, 1);
+    parfor i = 1:length(rbc_clusters)
+        pts = rbc_clusters{i};
+        if size(pts,1) < 4
+            continue;
+        end
+        try
+            shp = alphaShape(pts, 1.5);
+            [f, v] = boundaryFacets(shp);
+        catch
+            [~, f, v] = convhull(pts);
+        end
+        rbc_vertices{i} = v;
+        rbc_faces{i}    = f;
+        rbc_colors{i}   = repmat([255 0 0], size(v,1), 1);
+    end
 
-parfor i = 1:num_platelets
-    v = sp_v + platelet_centers(i,:);
-    f = sp_f;
-    platelet_vertices{i} = v;
-    platelet_faces{i}    = f;
-    platelet_colors{i}   = repmat([0 0 255], size(v,1), 1);
-end
+    % --- Parallelize Platelet spheres ---
+    [sp_v, sp_f] = icosphere(2);
+    sp_v = sp_v * 0.75;
+    num_platelets = size(platelet_centers, 1);
 
-% --- Merge all meshes together efficiently ---
+    platelet_vertices = cell(num_platelets, 1);
+    platelet_faces    = cell(num_platelets, 1);
+    platelet_colors   = cell(num_platelets, 1);
 
-% Fibrin
-all_v = vertcat(tube_vertices{:});
-offsets = cumsum([0; cellfun(@(v) size(v,1), tube_vertices(1:end-1))]);
-all_f = cell2mat(cellfun(@(f, o) f + o, tube_faces, num2cell(offsets), 'UniformOutput', false));
-all_c = vertcat(tube_colors{:});
+    parfor i = 1:num_platelets
+        v = sp_v + platelet_centers(i,:);
+        f = sp_f;
+        platelet_vertices{i} = v;
+        platelet_faces{i}    = f;
+        platelet_colors{i}   = repmat([0 0 255], size(v,1), 1);
+    end
 
-% RBCs
-rbc_v = vertcat(rbc_vertices{:});
-offsets = cumsum([0; cellfun(@(v) size(v,1), rbc_vertices(1:end-1))]);
-rbc_f = cell2mat(cellfun(@(f, o) f + o, rbc_faces, num2cell(offsets), 'UniformOutput', false));
-rbc_c = vertcat(rbc_colors{:});
+    % --- Merge all meshes together efficiently ---
 
-% Platelets
-pl_v = vertcat(platelet_vertices{:});
-offsets = cumsum([0; cellfun(@(v) size(v,1), platelet_vertices(1:end-1))]);
-pl_f = cell2mat(cellfun(@(f, o) f + o, platelet_faces, num2cell(offsets), 'UniformOutput', false));
-pl_c = vertcat(platelet_colors{:});
+    % Fibrin
+    all_v = vertcat(tube_vertices{:});
+    offsets = cumsum([0; cellfun(@(v) size(v,1), tube_vertices(1:end-1))]);
+    all_f = cell2mat(cellfun(@(f, o) f + o, tube_faces, num2cell(offsets), 'UniformOutput', false));
+    all_c = vertcat(tube_colors{:});
 
-% Final mesh
-fv_all.vertices = [all_v; rbc_v; pl_v];
-fv_all.faces    = [all_f; rbc_f + size(all_v,1); pl_f + size(all_v,1) + size(rbc_v,1)];
-fv_all.colors   = [all_c; rbc_c; pl_c];
+    % RBCs
+    rbc_v = vertcat(rbc_vertices{:});
+    offsets = cumsum([0; cellfun(@(v) size(v,1), rbc_vertices(1:end-1))]);
+    rbc_f = cell2mat(cellfun(@(f, o) f + o, rbc_faces, num2cell(offsets), 'UniformOutput', false));
+    rbc_c = vertcat(rbc_colors{:});
 
-% --- Write to PLY ---
-ply_filename = sprintf('clot_fullshape_%s.ply', datestr(now,'yyyymmdd_HHMM')); %#ok<TNOW1>
-writePLYMesh(fv_all.vertices, fv_all.faces, fv_all.colors, ply_filename);
-fprintf('✅ Blender mesh written to %s\n', ply_filename);
+    % Platelets
+    pl_v = vertcat(platelet_vertices{:});
+    offsets = cumsum([0; cellfun(@(v) size(v,1), platelet_vertices(1:end-1))]);
+    pl_f = cell2mat(cellfun(@(f, o) f + o, platelet_faces, num2cell(offsets), 'UniformOutput', false));
+    pl_c = vertcat(platelet_colors{:});
+
+    % Final mesh
+    fv_all.vertices = [all_v; rbc_v; pl_v];
+    fv_all.faces    = [all_f; rbc_f + size(all_v,1); pl_f + size(all_v,1) + size(rbc_v,1)];
+    fv_all.colors   = [all_c; rbc_c; pl_c];
+
+    % --- Write to PLY ---
+    ply_filename = sprintf('clot_fullshape_%s.ply', datestr(now,'yyyymmdd_HHMM')); %#ok<TNOW1>
+    writePLYMesh(fv_all.vertices, fv_all.faces, fv_all.colors, ply_filename);
+    fprintf('✅ Blender mesh written to %s\n', ply_filename);
 
 end
 
@@ -1165,4 +1161,4 @@ end
             map(key) = idx;
         end
     end
-end 
+end

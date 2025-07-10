@@ -61,13 +61,6 @@ for i = 1:numSpheres
         center_offset = (2 * rand(1, 3) - 1) * (1 - distance_factor) * (Window_size / 2);
         center = avg_center + center_offset;
         radius = rand()*max_diameter/2;
-        % % % Larger spheres closer to the average center, smaller further out
-        % % if distance_factor > 0.9
-        % %     radius = (0.5 + rand() * 0.5) * max_diameter; % Larger spheres (50%-100% of max diameter)
-        % % else
-        % %     radius = (0.1 + rand() * 0.4) * max_diameter; % Smaller spheres (10%-50% of max diameter)
-        % % end
-
         % Check if this sphere intersects any previously added spheres
         intersects = false;
         for j = 1:length(sphere_radii)
@@ -299,57 +292,57 @@ for iteration = 1:max_iterations
 
     % Add directional alignment force
     directional_forces = zeros(size(forces));
-    % for i = 1:size(bonds, 1)
-    %     p1 = bonds(i, 1);
-    %     p2 = bonds(i, 2);
-    %     bond_vector = Points(p2, :) - Points(p1, :);
-    %     bond_vector_normalized = bond_vector / norm(bond_vector);
-    %
-    %     % Calculate directional force as a projection onto the preferred direction
-    %     alignment_component = dot(bond_vector_normalized, preferred_direction);
-    %     alignment_force = direction_weight * alignment_component * preferred_direction;
-    %
-    %     % Apply directional force
-    %     directional_forces(p1, :) = directional_forces(p1, :) + alignment_force;
-    %     directional_forces(p2, :) = directional_forces(p2, :) - alignment_force;
-    % end
+    for i = 1:size(bonds, 1)
+        p1 = bonds(i, 1);
+        p2 = bonds(i, 2);
+        bond_vector = Points(p2, :) - Points(p1, :);
+        bond_vector_normalized = bond_vector / norm(bond_vector);
+
+        % Calculate directional force as a projection onto the preferred direction
+        alignment_component = dot(bond_vector_normalized, preferred_direction);
+        alignment_force = direction_weight * alignment_component * preferred_direction;
+
+        % Apply directional force
+        directional_forces(p1, :) = directional_forces(p1, :) + alignment_force;
+        directional_forces(p2, :) = directional_forces(p2, :) - alignment_force;
+    end
 
     % Balancing force for angles
     angle_forces = zeros(size(forces));
 
     % For each point, try to equalize angles between bonds
-    % for i = 1:size(Points, 1)
-    %     connected_bonds = find(bonds(:,1) == i | bonds(:,2) == i);
-    %     if numel(connected_bonds) < 2
-    %         continue; % Not enough bonds to calculate angles
-    %     end
-    %
-    %     vectors = zeros(numel(connected_bonds), 3);
-    %     for j = 1:numel(connected_bonds)
-    %         b = bonds(connected_bonds(j), :);
-    %         other = b(b ~= i);
-    %         vectors(j, :) = Points(other, :) - Points(i, :);
-    %         vectors(j, :) = vectors(j, :) / norm(vectors(j, :));
-    %     end
-    %
-    %     % Compute pairwise angles
-    %     for j = 1:size(vectors, 1)-1
-    %         for k = j+1:size(vectors,1)
-    %             v1 = vectors(j, :);
-    %             v2 = vectors(k, :);
-    %             angle = acos(dot(v1, v2));
-    %             ideal_angle = 2*pi / size(vectors, 1);
-    %             angle_diff = angle - ideal_angle;
-    %             torque = cross(v1, v2);
-    %             if norm(torque) > 0
-    %                 torque_dir = torque / norm(torque);
-    %                 % Small corrective force
-    %                 correction = angle_balancing_weight * angle_diff * torque_dir;
-    %                 angle_forces(i, :) = angle_forces(i, :) + correction;
-    %             end
-    %         end
-    %     end
-    % end
+    for i = 1:size(Points, 1)
+        connected_bonds = find(bonds(:,1) == i | bonds(:,2) == i);
+        if numel(connected_bonds) < 2
+            continue; % Not enough bonds to calculate angles
+        end
+
+        vectors = zeros(numel(connected_bonds), 3);
+        for j = 1:numel(connected_bonds)
+            b = bonds(connected_bonds(j), :);
+            other = b(b ~= i);
+            vectors(j, :) = Points(other, :) - Points(i, :);
+            vectors(j, :) = vectors(j, :) / norm(vectors(j, :));
+        end
+
+        % Compute pairwise angles
+        for j = 1:size(vectors, 1)-1
+            for k = j+1:size(vectors,1)
+                v1 = vectors(j, :);
+                v2 = vectors(k, :);
+                angle = acos(dot(v1, v2));
+                ideal_angle = 2*pi / size(vectors, 1);
+                angle_diff = angle - ideal_angle;
+                torque = cross(v1, v2);
+                if norm(torque) > 0
+                    torque_dir = torque / norm(torque);
+                    % Small corrective force
+                    correction = angle_balancing_weight * angle_diff * torque_dir;
+                    angle_forces(i, :) = angle_forces(i, :) + correction;
+                end
+            end
+        end
+    end
 
 
     % Total force = original force + directional force + angle_force
@@ -545,7 +538,7 @@ porosity = 1 - ((RBC_volume + Fibrin_volume + Platelet_volume) / Croped_clot_dim
 % % % Section 13: Export clot geometry for Blender
 % % % Bezier fibrin strands, RBC alpha surfaces, platelet spheres
 % % % ==========================================================
-% % % --- Crop points to export only within crop_min and crop_max ---
+% % % Crop points to export only within crop_min and crop_max ---
 in_crop_Points = all(Points >= crop_min & Points <= crop_max, 2);
 Points_cropped = Points(in_crop_Points, :);
 index_map = zeros(size(Points,1),1);
