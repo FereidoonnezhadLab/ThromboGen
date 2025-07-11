@@ -10,19 +10,19 @@ go_forward = false;
 
 rng(seed); % Set random seed for reproducibility
 % Define physical and simulation parameters
-numSpheres = 200;
-max_diameter_factor = 0.8;
-clot_volume = 6e7;
-Window_size = 150; % Simulation domain size (µm)
-Window_size_crop = 120; % Cropping size (µm)
-Croped_clot_dim = 240; % Matrix resolution per dimension
+numSpheres = randi(500);
+max_diameter_factor = rand();
+clot_volume = 5e7;
+Window_size = 100; % Simulation domain size (µm)
+Window_size_crop = 72; % Cropping size (µm)
+Croped_clot_dim = 144; % Matrix resolution per dimension
 Resolution = Window_size_crop / Croped_clot_dim; % µm per voxel
-platelet_ratio = 0.6;
-fibrin_concentration = 0.8; % g/L
+platelet_ratio = rand();
+fibrin_concentration = 0.1+2.5*rand(); % g/L
 voxel_volume = Window_size_crop^3;
 density_threshold = 0.001;
 platelet_radius = 1.5; %(um)
-rbc_filling_factor = 1;
+rbc_filling_factor = 0.5+0.5*rand();
 angle_balancing_weight = 1;
 
 % Interpolation constants for physical properties
@@ -311,7 +311,7 @@ for iteration = 1:max_iterations
     angle_forces = zeros(size(forces));
 
     % For each point, try to equalize angles between bonds
-    for i = 1:size(Points, 1)
+    parfor i = 1:size(Points, 1)
         connected_bonds = find(bonds(:,1) == i | bonds(:,2) == i);
         if numel(connected_bonds) < 2
             continue; % Not enough bonds to calculate angles
@@ -808,101 +808,101 @@ end
 % ==========================================================
 % Helper Function: place_rbc_in_spheres
 % ==========================================================
-function [ClotMatrix, rbc_points_all,rbc_indices] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, map_to_matrix,rbc_filling_factor)
-% Parameters
-RBC_diameter_noncompacted = 8; % in um
+function [ClotMatrix, rbc_points_all, rbc_indices] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, map_to_matrix, rbc_filling_factor)
+
+% Constants
+RBC_diameter_noncompacted = 8; % µm
+voxel_spacing = 0.5;
+Resolution = 72 / Croped_clot_dim;
+
+% Output initialization
 rbc_points_all = [];
-rbc_indices = {};  % Store indices for each RBC
+rbc_indices = {};
 
-for i = 1:length(sphere_radii)
-    radius_sphere = sphere_radii(i);
-    sphere_center = sphere_centers(i, :);
+num_restarts = 5;        % Number of restart attempts per sphere
+max_steps = 100;         % Optimization steps per restart
 
-    % Determine scaling factor and RBC diameter
+for s = 1:length(sphere_radii)
+    radius_sphere = sphere_radii(s);
+    center_sphere = sphere_centers(s, :);
+
+    % Scale RBCs based on sphere size
     scaling = 0.6 * (radius_sphere < 2 * RBC_diameter_noncompacted) + ...
-        0.9 * (radius_sphere >= 2 * RBC_diameter_noncompacted);
+              0.9 * (radius_sphere >= 2 * RBC_diameter_noncompacted);
     rbc_d = RBC_diameter_noncompacted * scaling;
-    min_dist = rbc_d;
-
-    % Precompute RBC shape constants
     [P, Q, R] = rbc_shape_constants(scaling);
 
-    % Estimate number of RBCs
-    num_RBCs = floor(rbc_filling_factor*(radius_sphere / (rbc_d / 2))^3);
-    % Start placing RBCs
-    rbc_positions = generate_random_point_in_sphere(radius_sphere-rbc_d/2, sphere_center);
-    max_attempts = 1000;
-    attempt = 0;
+    % Target RBC volume in voxels
+    sphere_volume_voxels = (4/3) * pi * (radius_sphere / Resolution)^3;
+    target_voxel_volume = rbc_filling_factor * sphere_volume_voxels;
 
-    while size(rbc_positions, 1) < num_RBCs && attempt < max_attempts
-        attempt = attempt + 1;
-        batch = generate_candidate_points(rbc_positions, rbc_d, 20);
-        valid = filter_valid_rbc_positions(batch, rbc_positions, sphere_center, radius_sphere, min_dist);
-        rbc_positions = [rbc_positions; valid];
-    end
-    % Generate voxelized RBCs
-    for j = 1:size(rbc_positions, 1)
-        center = rbc_positions(j, :);
-        rot = rand(1, 3) * pi;
-        rbc_pts = generate_rbc_voxels(center, rot, P, Q, R);
-        if size(rbc_pts, 1) >= 4
-            offset = size(rbc_points_all, 1);
-            rbc_points_all = [rbc_points_all; rbc_pts];
-            rbc_indices{end+1} = offset + (1:size(rbc_pts, 1));
+    % Keep best result over all restarts
+    best_voxel_count = 0;
+    best_voxel_mask = false(Croped_clot_dim, Croped_clot_dim, Croped_clot_dim);
+    best_rbc_pts = [];
+    best_rbc_idx = {};
+
+    for trial = 1:num_restarts
+        temp_voxel_mask = false(Croped_clot_dim, Croped_clot_dim, Croped_clot_dim);
+        temp_rbc_pts = [];
+        temp_rbc_idx = {};
+        voxel_count = 0;
+
+        for step = 1:max_steps
+            candidate_center = generate_random_point_in_sphere(radius_sphere - rbc_d/2, center_sphere);
+            rot = rand(1, 3) * pi;
+            rbc_pts = generate_rbc_voxels(candidate_center, rot, P, Q, R, voxel_spacing);
+
+            if size(rbc_pts,1) < 4
+                continue;
+            end
+
+            rbc_idx_array = map_to_matrix(rbc_pts);
+            valid_mask = all(rbc_idx_array > 0, 2) & all(rbc_idx_array <= Croped_clot_dim, 2);
+            valid_vox = rbc_idx_array(valid_mask, :);
+
+            lin_idx = sub2ind([Croped_clot_dim, Croped_clot_dim, Croped_clot_dim], ...
+                              valid_vox(:,1), valid_vox(:,2), valid_vox(:,3));
+
+            % Voxel-level hard constraint
+            if all(ClotMatrix(lin_idx) == 0 & ~temp_voxel_mask(lin_idx))
+                temp_voxel_mask(lin_idx) = true;
+                offset = size(temp_rbc_pts, 1);
+                temp_rbc_pts = [temp_rbc_pts; rbc_pts];
+                temp_rbc_idx{end+1} = offset + (1:size(rbc_pts,1));
+                voxel_count = voxel_count + numel(lin_idx);
+
+                if voxel_count >= target_voxel_volume
+                    break;
+                end
+            end
+        end
+
+        % Keep best trial
+        if voxel_count > best_voxel_count
+            best_voxel_mask = temp_voxel_mask;
+            best_rbc_pts = temp_rbc_pts;
+            best_rbc_idx = temp_rbc_idx;
+            best_voxel_count = voxel_count;
         end
     end
+
+    % Add best result to final matrix
+    ClotMatrix(best_voxel_mask) = 1;
+    offset = size(rbc_points_all, 1);
+    rbc_points_all = [rbc_points_all; best_rbc_pts];
+    for k = 1:length(best_rbc_idx)
+        rbc_indices{end+1} = offset + best_rbc_idx{k};
+    end
+end
 end
 
-% Convert to matrix indices
-rbc_idx_array = map_to_matrix(rbc_points_all);  % N x 3 matrix
-
-% Remove out-of-bound indices
-valid_mask = all(rbc_idx_array > 0, 2) & all(rbc_idx_array <= Croped_clot_dim, 2);
-valid_indices = rbc_idx_array(valid_mask, :);
-
-% Convert to linear indices for assignment
-lin_idx = sub2ind([Croped_clot_dim, Croped_clot_dim, Croped_clot_dim], valid_indices(:,1), valid_indices(:,2), valid_indices(:,3));
-
-% Assign RBCs to matrix in one go
-empty_voxel_mask = ClotMatrix(lin_idx) == 0;
-ClotMatrix(lin_idx(empty_voxel_mask)) = 1;
-
-end
 % ==========================================================
 % Helper Function: generate_random_point_in_sphere
 % ==========================================================
 function pt = generate_random_point_in_sphere(R, center)
 theta = 2 * pi * rand(); phi = acos(2 * rand() - 1); r = R * rand()^(1/3);
 pt = center + [r * sin(phi) * cos(theta), r * sin(phi) * sin(theta), r * cos(phi)];
-end
-% ==========================================================
-% Helper Function: generate_candidate_point
-% ==========================================================
-function batch = generate_candidate_points(existing, diameter, N)
-idx = randi(size(existing, 1), N, 1);
-offsets = random_directions(N) .* (diameter + rand(N, 1) * (diameter / 2));
-batch = existing(idx, :) + offsets;
-end
-% ==========================================================
-% Helper Function: random_directions
-% ==========================================================
-function dirs = random_directions(N)
-theta = 2 * pi * rand(N, 1);
-phi = acos(2 * rand(N, 1) - 1);
-dirs = [sin(phi) .* cos(theta), sin(phi) .* sin(theta), cos(phi)];
-end
-% ==========================================================
-% Helper Function: filter_valid_rbc_positions
-% ==========================================================
-function valid = filter_valid_rbc_positions(candidates, existing, center, radius, min_dist)
-valid = [];
-for i = 1:size(candidates, 1)
-    if norm(candidates(i,:) - center) <= radius
-        if all(sqrt(sum((existing - candidates(i,:)).^2, 2)) > min_dist)
-            valid = [valid; candidates(i,:)];
-        end
-    end
-end
 end
 % ==========================================================
 % Helper Function: rbc_shape_constants
@@ -916,14 +916,23 @@ end
 % ==========================================================
 % Helper Function: generate_rbc_voxels
 % ==========================================================
-function pts = generate_rbc_voxels(center, rot, P, Q, R)
-[x, y, z] = meshgrid(center(1)-10:0.5:center(1)+10, ...
-    center(2)-10:0.5:center(2)+10, ...
-    center(3)-10:0.5:center(3)+10);
-[xr, yr, zr] = rotate_grid(x, y, z, center, rot);
-eq = ((xr).^2 + (yr).^2 + (zr).^2).^2 + P * ((xr).^2 + (yr).^2) + Q * (zr).^2 + R;
-pts = [x(eq <= 0), y(eq <= 0), z(eq <= 0)];
+function pts = generate_rbc_voxels(center, rot, P, Q, R, voxel_spacing)
+    % Create a local grid around the center
+    range = 10; % µm from center to define bounding box
+    [x, y, z] = meshgrid(center(1)-range:voxel_spacing:center(1)+range, ...
+                         center(2)-range:voxel_spacing:center(2)+range, ...
+                         center(3)-range:voxel_spacing:center(3)+range);
+
+    % Apply rotation
+    [xr, yr, zr] = rotate_grid(x, y, z, center, rot);
+
+    % Apply RBC implicit equation
+    eq = ((xr).^2 + (yr).^2 + (zr).^2).^2 + P * ((xr).^2 + (yr).^2) + Q * (zr).^2 + R;
+
+    % Keep only voxels inside the shape
+    pts = [x(eq <= 0), y(eq <= 0), z(eq <= 0)];
 end
+
 % ==========================================================
 % Helper Function: rotate_grid
 % ==========================================================
