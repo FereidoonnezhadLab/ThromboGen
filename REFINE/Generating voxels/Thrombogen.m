@@ -806,223 +806,179 @@ dt = delaunayTriangulation(all_points);
 total_volume = volume * 1.1;
 end
 % ==========================================================
-% Helper Function: place_rbc_in_spheres  (FIXED MASK SIZES)
+% Helper Function: place_rbc_in_spheres  (UPDATED LAYERED PLACER)
 % ==========================================================
 function [ClotMatrix, rbc_points_all, rbc_indices] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, map_to_matrix, rbc_filling_factor)
 
-% ---------- Static / global voxel geometry ----------
-voxel_spacing = 0.5;                   % µm sampling when voxelizing an RBC
-Resolution    = 72 / Croped_clot_dim;  % µm per voxel
+% Voxel / geometry constants
+voxel_spacing = 0.5;                 % µm (sampling when voxelizing an RBC)
+Resolution    = 72 / Croped_clot_dim; % µm per voxel (same as caller uses)
 
-% ---------- Outputs ----------
+% Outputs
 rbc_points_all = [];
 rbc_indices    = {};
 
 for s = 1:numel(sphere_radii)
-    R_s = sphere_radii(s);
-    C_s = sphere_centers(s, :);
+    R_s   = sphere_radii(s);
+    C_s   = sphere_centers(s, :);
 
-    % --- Sphere capacity target in voxels
-    sphere_volume_vox = (4/3) * pi * (R_s / Resolution)^3;
-    target_voxel_volume = rbc_filling_factor * sphere_volume_vox;
-
-    % --- RBC size scaling
+    % --- RBC size scaling for this sphere (same logic as your code)
     RBC_diameter_noncompacted = 8; % µm
     scaling = 0.6 * (R_s < 2 * RBC_diameter_noncompacted) + ...
               0.9 * (R_s >= 2 * RBC_diameter_noncompacted);
-    rbc_d   = RBC_diameter_noncompacted * scaling;   % in-plane "diameter"
-    r_bound = 0.6 * rbc_d;            % conservative bounding sphere radius (µm)
 
-    % --- RBC implicit shape parameters
+    % RBC implicit shape params
     [P, Q, R] = rbc_shape_constants(scaling);
 
-    % --- Measure RBC thickness once (voxelized)
+    % --- Estimate RBC "thickness" by voxelizing one canonical RBC
     test_pts = generate_rbc_voxels([0,0,0], [0,0,0], P, Q, R, voxel_spacing);
     if isempty(test_pts)
+        % Fallback thickness if sampling failed (rare)
         rbc_thickness_um = 2.5;
     else
-        rbc_thickness_um = max(2.0, max(test_pts(:,3)) - min(test_pts(:,3)));
+        z_extent = max(test_pts(:,3)) - min(test_pts(:,3));
+        rbc_thickness_um = max(z_extent, 2.0); % ensure a sane minimum
     end
+    region_radius = rbc_thickness_um;  % "about the same as the RBC thickness"
 
-    % --- Shell step (slightly overlapping to avoid voids)
-    shell_thickness = 0.8 * rbc_thickness_um;       % overlap between shells
-    region_radius   = rbc_thickness_um;             % requested "region radius"
+    % --- Target fill (same definition as your previous approach)
+    sphere_volume_voxels = (4/3) * pi * (R_s / Resolution)^3;
+    target_voxel_volume  = rbc_filling_factor * sphere_volume_voxels;
 
-    % --- Per-sphere accumulators
+    % Accumulators for this sphere
     temp_voxel_mask = false(Croped_clot_dim, Croped_clot_dim, Croped_clot_dim);
     temp_rbc_pts    = [];
     temp_rbc_idx    = {};
     voxel_count     = 0;
 
-    % --- Keep track of placed RBC centers for early-rejection
-    placed_centers = zeros(0,3);
-
-    % ========== 1) Seed the very first RBC at the center ==========
-    seeded = false;
-    for tr = 1:50
+    % ---------- LAYERED GROWTH FROM CENTER ----------
+    % 1) Place the first RBC at the sphere center
+    placed_any = false;
+    for trial = 1:50
         rot = rand(1,3) * pi;
-        pts = generate_rbc_voxels(C_s, rot, P, Q, R, voxel_spacing);
-        if size(pts,1) < 4, continue; end
+        rbc_pts  = generate_rbc_voxels(C_s, rot, P, Q, R, voxel_spacing);
+        if size(rbc_pts,1) < 4, continue; end
 
-        idx = map_to_matrix(pts);
-        inb = all(idx >= 1, 2) & all(idx <= Croped_clot_dim, 2);
-        if ~any(inb), continue; end
+        % Map to voxels
+        r_idx = map_to_matrix(rbc_pts);
+        in_bounds = all(r_idx >= 1, 2) & all(r_idx <= Croped_clot_dim, 2);
+        r_idx = r_idx(in_bounds, :);
 
-        % FIX: compute inside_s on full pts; then build a same-length mask
-        inside_s = vecnorm((pts - C_s), 2, 2) <= (R_s - 0.1);
-        valid_mask = inb & inside_s;
-        if ~any(valid_mask), continue; end
+        if isempty(r_idx), continue; end
+        lin_idx = sub2ind([Croped_clot_dim, Croped_clot_dim, Croped_clot_dim], r_idx(:,1), r_idx(:,2), r_idx(:,3));
 
-        idx = idx(valid_mask, :);
-        lin = sub2ind([Croped_clot_dim, Croped_clot_dim, Croped_clot_dim], idx(:,1), idx(:,2), idx(:,3));
+        % Non-intersection with existing clot + within sphere
+        inside_sphere = vecnorm((rbc_pts(in_bounds,:) - C_s), 2, 2) <= (R_s - 0.1);
+        lin_idx = lin_idx(inside_sphere);
 
-        if ~isempty(lin) && all(ClotMatrix(lin) == 0 & ~temp_voxel_mask(lin))
-            temp_voxel_mask(lin) = true;
-            off = size(temp_rbc_pts,1);
-            temp_rbc_pts  = [temp_rbc_pts; pts(valid_mask,:)];
-            temp_rbc_idx{end+1} = off + (1:sum(valid_mask));
-            voxel_count    = voxel_count + numel(lin);
-            placed_centers = [placed_centers; C_s];
-            seeded = true;
+        if ~isempty(lin_idx) && all(ClotMatrix(lin_idx) == 0 & ~temp_voxel_mask(lin_idx))
+            temp_voxel_mask(lin_idx) = true;
+            offset        = size(temp_rbc_pts,1);
+            temp_rbc_pts  = [temp_rbc_pts; rbc_pts(in_bounds,:)];
+            temp_rbc_idx{end+1} = offset + (1:sum(in_bounds));
+            voxel_count   = voxel_count + numel(lin_idx);
+            placed_any    = true;
             break;
         end
     end
-    if ~seeded
-        % Commit (empty) and continue to next sphere
+    if ~placed_any
+        % Could not seed the first RBC; move to next sphere
         ClotMatrix(temp_voxel_mask) = 1;
-        off = size(rbc_points_all,1);
+        offset = size(rbc_points_all,1);
         rbc_points_all = [rbc_points_all; temp_rbc_pts];
-        for k = 1:numel(temp_rbc_idx), rbc_indices{end+1} = off + temp_rbc_idx{k}; end
+        for k = 1:numel(temp_rbc_idx)
+            rbc_indices{end+1} = offset + temp_rbc_idx{k};
+        end
         continue;
     end
 
-    % ========== 2) Grow outward in overlapping shells with Poisson-disk candidates ==========
-    r_curr = region_radius;
-    no_progress_shells = 0;
+    % 2) Grow spherical regions (shells) outward from the center
+    current_radius = region_radius; % next shell center distance from sphere center
+    max_shell_tries_without_progress = 200;
 
-    while voxel_count < target_voxel_volume && (r_curr + r_bound) <= (R_s - 0.1)
-        % --- Estimate shell volume & candidate count cap
-        shell_vol = 4*pi*(r_curr^2) * shell_thickness;
-        if ~isempty(test_pts)
-            rbc_vox_vol = size(test_pts,1) * (Resolution^3);  % approx µm^3
-        else
-            rbc_vox_vol = 0.6 * pi*(rbc_d/2)^2 * rbc_thickness_um; % geometric fallback
-        end
-        pack_frac  = 0.60; % decent random packing fraction
-        est_count  = max(1, floor((shell_vol / rbc_vox_vol) * pack_frac));
+    while voxel_count < target_voxel_volume && (current_radius + region_radius) <= (R_s - 0.1)
+        shell_progress = false;
+        stalled_trials = 0;
 
-        % --- Generate Poisson-disk candidate directions on the shell
-        min_sep   = 0.95 * (2*r_bound);         % µm
-        min_angle = min(0.9*pi, 2*asin(min_sep/(2*max(r_curr,1e-6)))); % rad
+        % Try to place "a few" RBCs in this shell (adaptive cap)
+        max_new_in_shell = 12;
 
-        cand_dirs = zeros(0,3);
-        max_tries = 1000;
-        tries = 0;
-        while size(cand_dirs,1) < est_count && tries < max_tries
-            tries = tries + 1;
-            u = rand(); v = rand();
-            th = 2*pi*u; ph = acos(2*v - 1);
-            d = [sin(ph)*cos(th), sin(ph)*sin(th), cos(ph)];
-            if isempty(cand_dirs)
-                cand_dirs = d;
-            else
-                ang = acos(max(-1,min(1, cand_dirs * d')));
-                if all(ang > min_angle)
-                    cand_dirs = [cand_dirs; d];
-                end
-            end
-        end
+        new_in_shell = 0;
+        while new_in_shell < max_new_in_shell && voxel_count < target_voxel_volume ...
+                && stalled_trials < max_shell_tries_without_progress
 
-        % --- Try placing 1 RBC at each candidate (up to 50 orientations)
-        placed_in_shell = 0;
-        for c = 1:size(cand_dirs,1)
-            if voxel_count >= target_voxel_volume, break; end
-
-            rc = r_curr + (rand()-0.5)*region_radius;        % radial jitter
-            center_cand = C_s + rc * cand_dirs(c,:);
-
-            % Early rejections
-            if norm(center_cand - C_s) + r_bound > (R_s - 0.1)
-                continue;
-            end
-            if ~isempty(placed_centers)
-                if any(vecnorm(placed_centers - center_cand, 2, 2) < (0.95 * (2*r_bound)))
-                    continue;
-                end
-            end
-
-            accepted = false;
+            % Attempt one RBC up to 50 orientations/positions in THIS shell
+            placed_this = false;
             for attempt = 1:50
-                % Bias orientation near wall half the time
-                if rand() < 0.5
-                    rdir = (center_cand - C_s);
-                    rdir = rdir / (norm(rdir) + 1e-12);
-                    up = [0 0 1];
-                    if abs(dot(up,rdir)) > 0.95, up = [0 1 0]; end
-                    xax = cross(up, rdir); xax = xax / (norm(xax)+1e-12);
-                    yax = cross(rdir, xax);
-                    Rm = [xax(:)'; yax(:)'; rdir(:)'];
-                    sy = sqrt(Rm(1,1)^2 + Rm(2,1)^2);
-                    if sy > 1e-6
-                        eul = [atan2(Rm(3,2), Rm(3,3)), atan2(-Rm(3,1), sy), atan2(Rm(2,1), Rm(1,1))];
-                    else
-                        eul = [atan2(-Rm(2,3), Rm(2,2)), atan2(-Rm(3,1), sy), 0];
-                    end
-                    rot = eul + (rand(1,3)-0.5)*0.4;
-                else
-                    rot = rand(1,3) * pi;
-                end
+                % Random direction on sphere + small radial jitter within [r - t/2, r + t/2]
+                u = rand(); v = rand();
+                theta = 2*pi*u;
+                phi   = acos(2*v - 1);
+                dir   = [sin(phi)*cos(theta), sin(phi)*sin(theta), cos(phi)];
 
-                pts = generate_rbc_voxels(center_cand, rot, P, Q, R, voxel_spacing);
-                if size(pts,1) < 4, continue; end
+                rad   = current_radius + (rand()-0.5) * region_radius; % jitter within ~thickness
+                cand_center = C_s + rad * dir;
 
-                idx = map_to_matrix(pts);
-                inb = all(idx >= 1, 2) & all(idx <= Croped_clot_dim, 2);
-                if ~any(inb), continue; end
+                % Random rotation
+                rot = rand(1,3) * pi;
 
-                % FIX: build same-length valid mask (no size mismatch)
-                inside_s = vecnorm((pts - C_s), 2, 2) <= (R_s - 0.1);
-                valid_mask = inb & inside_s;
-                if ~any(valid_mask), continue; end
+                rbc_pts  = generate_rbc_voxels(cand_center, rot, P, Q, R, voxel_spacing);
+                if size(rbc_pts,1) < 4, continue; end
 
-                idx = idx(valid_mask, :);
-                lin = sub2ind([Croped_clot_dim, Croped_clot_dim, Croped_clot_dim], idx(:,1), idx(:,2), idx(:,3));
+                % Keep only voxels that map in bounds
+                r_idx = map_to_matrix(rbc_pts);
+                in_bounds = all(r_idx >= 1, 2) & all(r_idx <= Croped_clot_dim, 2);
+                r_idx = r_idx(in_bounds, :);
+                if isempty(r_idx), continue; end
 
-                if ~isempty(lin) && all(ClotMatrix(lin) == 0 & ~temp_voxel_mask(lin))
-                    temp_voxel_mask(lin) = true;
-                    off = size(temp_rbc_pts,1);
-                    temp_rbc_pts  = [temp_rbc_pts; pts(valid_mask,:)];
-                    temp_rbc_idx{end+1} = off + (1:sum(valid_mask));
-                    voxel_count    = voxel_count + numel(lin);
-                    placed_centers = [placed_centers; center_cand];
-                    placed_in_shell = placed_in_shell + 1;
-                    accepted = true;
+                % Must lie inside the sphere
+                inside_sphere = vecnorm((rbc_pts(in_bounds,:) - C_s), 2, 2) <= (R_s - 0.1);
+                if ~any(inside_sphere), continue; end
+                r_idx = r_idx(inside_sphere, :);
+                lin_idx = sub2ind([Croped_clot_dim, Croped_clot_dim, Croped_clot_dim], r_idx(:,1), r_idx(:,2), r_idx(:,3));
+
+                % Non-intersection with existing
+                if ~isempty(lin_idx) && all(ClotMatrix(lin_idx) == 0 & ~temp_voxel_mask(lin_idx))
+                    % Place it
+                    temp_voxel_mask(lin_idx) = true;
+                    offset        = size(temp_rbc_pts,1);
+                    temp_rbc_pts  = [temp_rbc_pts; rbc_pts(in_bounds,:)];
+                    temp_rbc_idx{end+1} = offset + (1:sum(in_bounds));
+                    voxel_count   = voxel_count + numel(lin_idx);
+
+                    placed_this   = true;
+                    shell_progress = true;
+                    new_in_shell  = new_in_shell + 1;
                     break;
                 end
             end
+
+            if ~placed_this
+                stalled_trials = stalled_trials + 1;
+            else
+                stalled_trials = 0; % reset if we placed one
+            end
         end
 
-        if placed_in_shell == 0
-            no_progress_shells = no_progress_shells + 1;
-        else
-            no_progress_shells = 0;
-        end
-        if no_progress_shells >= 3
+        % Advance to next shell (region) — step by ~one RBC "height"
+        current_radius = current_radius + region_radius;
+
+        % If we made no progress in this shell and we're near the boundary, break
+        if ~shell_progress && (current_radius + region_radius) > (R_s - 0.1)
             break;
         end
-
-        r_curr = r_curr + shell_thickness;
     end
 
-    % --- Commit this sphere's best to global outputs
+    % Commit best for this sphere to the global matrix & outputs
     ClotMatrix(temp_voxel_mask) = 1;
-    off = size(rbc_points_all,1);
+    offset = size(rbc_points_all,1);
     rbc_points_all = [rbc_points_all; temp_rbc_pts];
     for k = 1:numel(temp_rbc_idx)
-        rbc_indices{end+1} = off + temp_rbc_idx{k};
+        rbc_indices{end+1} = offset + temp_rbc_idx{k};
     end
 end
 end
+
 
 % ==========================================================
 % Helper Function: rbc_shape_constants
