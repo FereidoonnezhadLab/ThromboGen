@@ -1,28 +1,37 @@
 % ==========================================================
 % Fibrin Network Simulation Script
 % ==========================================================
-function [porosity, composition, ClotMatrix] = Thrombogen(counter)
+function [porosity, composition, ClotMatrix, params] = Thrombogen(counter,P)
 % ==========================================================
 % Section 0: Initialization
 % ==========================================================
 seed = 2000 + counter;
-go_forward = false;
-
 rng(seed); % Set random seed for reproducibility
-% Define physical and simulation parameters
-numSpheres = randi(500);
-max_diameter_factor = rand();
+
+% Defaults (random) 
+numSpheres           = randi(500);
+max_diameter_factor  = rand();
+platelet_ratio       = rand();
+fibrin_concentration = 0.1 + 2.5*rand();  % g/L
+rbc_filling_factor   = 0.5 + 0.5*rand();
+
+% Apply overrides if provided
+if nargin >= 2 && ~isempty(P)
+    if isfield(P,'numSpheres'),           numSpheres           = P.numSpheres;           end
+    if isfield(P,'max_diameter_factor'),  max_diameter_factor  = P.max_diameter_factor;  end
+    if isfield(P,'platelet_ratio'),       platelet_ratio       = P.platelet_ratio;       end
+    if isfield(P,'fibrin_concentration'), fibrin_concentration = P.fibrin_concentration; end
+    if isfield(P,'rbc_filling_factor'),   rbc_filling_factor   = P.rbc_filling_factor;   end
+end
+
 clot_volume = 5e7;
 Window_size = 100; % Simulation domain size (µm)
 Window_size_crop = 72; % Cropping size (µm)
 Croped_clot_dim = 144; % Matrix resolution per dimension
 Resolution = Window_size_crop / Croped_clot_dim; % µm per voxel
-platelet_ratio = rand();
-fibrin_concentration = 0.1+2.5*rand(); % g/L
 voxel_volume = Window_size_crop^3;
 density_threshold = 0.001;
 platelet_radius = 1.5; %(um)
-rbc_filling_factor = 0.5+0.5*rand();
 angle_balancing_weight = 1;
 
 % Interpolation constants for physical properties
@@ -95,7 +104,8 @@ end
 clot_volume_um3 = max((4/3)*pi*Window_size_crop^3,calculate_clot_volume(sphere_centers, sphere_radii));
 total_inclusion_volume_um3 = sum((4 / 3) * pi * (sphere_radii.^3));
 % Calculate effective fibrin volume (excluding inclusions)
-effective_fibrin_volume_um3 = 1.5*(clot_volume_um3 - total_inclusion_volume_um3);
+eff_mult = 0.8 + 1.2*rand();   % 0.8–2.0
+effective_fibrin_volume_um3 = eff_mult * (clot_volume_um3 - total_inclusion_volume_um3);
 % Convert fibrin concentration from g/L to g/um^3 and estimate fibrin volume
 fibrin_concentration_um3 = fibrin_concentration * 1e-15; % Convert to g/um^3
 fibrin_density = 1.395 * 1e-12; % Assume fibrin density in g/um^3
@@ -111,9 +121,7 @@ total_bond_length = fibrin_volume_um3 / (pi * fibrin_radius^2);
 % Calculate target mean bond length and estimate the number of required nodes
 target_mean_length = interp1([C1, C2], [L1, L2], fibrin_concentration, 'linear', 'extrap');
 numPoints = ceil(total_bond_length / target_mean_length);
-if numPoints < 1000
-    go_forward = false;
-end
+
 
 % ==========================================================
 % Section 4: Generate Clustered Points
@@ -520,7 +528,7 @@ map_to_matrix = @(coords) round((coords - crop_min) / Resolution) + 1;
 % ==========================================================
 % Section 13: Insert RBCs
 % ==========================================================
-[ClotMatrix, rbc_points_all,rbc_indices] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, map_to_matrix,rbc_filling_factor);
+[ClotMatrix, rbc_points_all,rbc_indices] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, Window_size_crop, map_to_matrix, rbc_filling_factor);
 % ==========================================================
 % Section 14: Insert Platelets
 % ==========================================================
@@ -535,10 +543,18 @@ RBC_volume = nnz(ClotMatrix(:) == 1);
 composition = RBC_volume / (RBC_volume + Fibrin_volume + Platelet_volume);
 porosity = 1 - ((RBC_volume + Fibrin_volume + Platelet_volume) / Croped_clot_dim^3);
 
+params = struct( ...
+    'numSpheres', numSpheres, ...
+    'max_diameter_factor', max_diameter_factor, ...
+    'platelet_ratio', platelet_ratio, ...
+    'fibrin_concentration', fibrin_concentration, ...
+    'rbc_filling_factor', rbc_filling_factor );
+
+
 % % % Section 13: Export clot geometry for Blender
 % % % Bezier fibrin strands, RBC alpha surfaces, platelet spheres
 % % % ==========================================================
-% % % Crop points to export only within crop_min and crop_max ---
+% Crop points to export only within crop_min and crop_max ---
 in_crop_Points = all(Points >= crop_min & Points <= crop_max, 2);
 Points_cropped = Points(in_crop_Points, :);
 index_map = zeros(size(Points,1),1);
@@ -808,11 +824,11 @@ end
 % ==========================================================
 % Helper Function: place_rbc_in_spheres  (UPDATED LAYERED PLACER)
 % ==========================================================
-function [ClotMatrix, rbc_points_all, rbc_indices] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, map_to_matrix, rbc_filling_factor)
+function [ClotMatrix, rbc_points_all, rbc_indices] = place_rbc_in_spheres(ClotMatrix, sphere_centers, sphere_radii, Croped_clot_dim, Window_size_crop, map_to_matrix, rbc_filling_factor)
 
 % Voxel / geometry constants
 voxel_spacing = 0.5;                 % µm (sampling when voxelizing an RBC)
-Resolution    = 72 / Croped_clot_dim; % µm per voxel (same as caller uses)
+Resolution    = Window_size_crop/Croped_clot_dim; % µm per voxel 
 
 % Outputs
 rbc_points_all = [];
@@ -993,20 +1009,20 @@ end
 % Helper Function: generate_rbc_voxels
 % ==========================================================
 function pts = generate_rbc_voxels(center, rot, P, Q, R, voxel_spacing)
-    % Create a local grid around the center
-    range = 10; % µm from center to define bounding box
-    [x, y, z] = meshgrid(center(1)-range:voxel_spacing:center(1)+range, ...
-                         center(2)-range:voxel_spacing:center(2)+range, ...
-                         center(3)-range:voxel_spacing:center(3)+range);
+% Create a local grid around the center
+range = 10; % µm from center to define bounding box
+[x, y, z] = meshgrid(center(1)-range:voxel_spacing:center(1)+range, ...
+    center(2)-range:voxel_spacing:center(2)+range, ...
+    center(3)-range:voxel_spacing:center(3)+range);
 
-    % Apply rotation
-    [xr, yr, zr] = rotate_grid(x, y, z, center, rot);
+% Apply rotation
+[xr, yr, zr] = rotate_grid(x, y, z, center, rot);
 
-    % Apply RBC implicit equation
-    eq = ((xr).^2 + (yr).^2 + (zr).^2).^2 + P * ((xr).^2 + (yr).^2) + Q * (zr).^2 + R;
+% Apply RBC implicit equation
+eq = ((xr).^2 + (yr).^2 + (zr).^2).^2 + P * ((xr).^2 + (yr).^2) + Q * (zr).^2 + R;
 
-    % Keep only voxels inside the shape
-    pts = [x(eq <= 0), y(eq <= 0), z(eq <= 0)];
+% Keep only voxels inside the shape
+pts = [x(eq <= 0), y(eq <= 0), z(eq <= 0)];
 end
 
 % ==========================================================
