@@ -13,8 +13,8 @@ C++ compiler for Matlab
 Kwave
 ValoMC
 
-Copyright (c) Hamed Ghodsi, Postdoc Researcher, PME, ME, TU Delft (2025)
+Copyright (c) Hamed Ghodsi, Postdoc Researcher, ME, TU Delft (2025)
 
-To Cite this work please cite one of these articles: 
+When using ThromboGen, please cite the following articles: 
 
 
