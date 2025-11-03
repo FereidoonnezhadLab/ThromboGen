@@ -50,7 +50,7 @@ Ensure the following MATLAB toolboxes are installed:
 | Package | Description | Link |
 |----------|--------------|------|
 | **k-Wave Toolbox** | Time-domain acoustic and photoacoustic simulations | [https://www.k-wave.org](https://www.k-wave.org) |
-| **ValoMC** | Monte Carlo light transport simulation in voxel grids | [https://github.com/ssit/ValoMC](https://github.com/ssit/ValoMC) |
+| **ValoMC** | Monte Carlo light transport simulation in voxel grids | [https://github.com/InverseLight/ValoMC](https://github.com/InverseLight/ValoMC) |
 | **C++ MEX compiler** | Required for custom geometry and relaxation functions | Run `mex -setup C++` in MATLAB |
 
 ### 3. (Optional) Visualization
