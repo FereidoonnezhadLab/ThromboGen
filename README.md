@@ -230,8 +230,8 @@ For major updates, please open a discussion first.
 ## 📫 Contact
 
 **Fereidoonnezhad Lab**  
-📧 [h.ghodsi@tudelft.nl,b.fereidoonnezhad@tudelft.nl]  
-🏛️ [TU Delft, ME, BME, CVB group]  
+📧 [h.ghodsi@tudelft.nl, b.fereidoonnezhad@tudelft.nl, S.Iskander-Rizk@tudelft.nl]  
+🏛️ [TU Delft, Faculty of Mechanical Engineering]  
 🌐 [https://github.com/FereidoonnezhadLab/ThromboGen](https://github.com/FereidoonnezhadLab/ThromboGen)
 
 ---
