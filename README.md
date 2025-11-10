@@ -191,7 +191,8 @@ If you use or expand this framework, please cite the following article:
 
 > Ghodsi, Hamed, Sara Cardona, Behrooz Fereidoonnezhad, and Sophinese Iskander-Rizk. "A multiscale framework for in silico thrombus generation and photoacoustic simulations." Journal of Physics: Photonics (2025). doi: http://doi.org/10.1088/2515-7647/ae1b54
 
-> @article{ghodsi2025multiscale,
+~~~bibtex
+@article{ghodsi2025multiscale,
   title={A multiscale framework for in silico thrombus generation and photoacoustic simulations},
   volume = {},
   ISSN = {},
@@ -204,6 +205,7 @@ If you use or expand this framework, please cite the following article:
   month = Nov,
   pages = {}
 }
+~~~
 ---
 
 ## ⚖️ License
