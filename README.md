@@ -189,14 +189,21 @@ end
 
 If you use or expand this framework, please cite the following article:
 
-> *A Multiscale Framework for In Silico 
-Thrombus Generation and 
-Photoacoustic Simulations*  
-> Authors: [H.Ghodsi et al.]  
-> Journal: [Journal of Physics Photonics]  
-> Year: [2025]
-> doi: *[To be added]*
+> Ghodsi, Hamed, Sara Cardona, Behrooz Fereidoonnezhad, and Sophinese Iskander-Rizk. "A multiscale framework for in silico thrombus generation and photoacoustic simulations." Journal of Physics: Photonics (2025). doi: http://doi.org/10.1088/2515-7647/ae1b54
 
+@article{ghodsi2025multiscale,
+  title={A multiscale framework for in silico thrombus generation and photoacoustic simulations},
+  volume = {},
+  ISSN = {},
+  url = {http://dx.doi.org/10.1088/2515-7647/ae1b54},
+  DOI = {10.1088/2515-7647/ae1b54},
+  journal={Journal of Physics: Photonics},
+  publisher = {IOP Publishing Ltd},
+  author={Ghodsi, Hamed and Cardona, Sara and Fereidoonnezhad, Behrooz and Iskander-Rizk, Sophinese},
+  year = {2025},
+  month = Nov,
+  pages = {}
+}
 ---
 
 ## ⚖️ License
