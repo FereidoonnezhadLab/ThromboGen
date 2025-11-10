@@ -202,7 +202,7 @@ If you use or expand this framework, please cite the following article:
   publisher = {IOP Publishing Ltd},
   author={Ghodsi, Hamed and Cardona, Sara and Fereidoonnezhad, Behrooz and Iskander-Rizk, Sophinese},
   year = {2025},
-  month = Nov,
+  month = {Nov},
   pages = {}
 }
 ~~~
